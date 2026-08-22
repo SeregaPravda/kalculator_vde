@@ -368,13 +368,15 @@ insert into public.pending_profiles (email, full_name, phone, filial) values
   ('pavlo.boichuk@pa.ua',         'Бойчук Павло',          '+380673534523', 'Львів'),
   ('yurii.dublianko@pa.ua',       'Дублянко Юрій',         '+380670080883', 'Львів'),
   ('mariia.olesenko@pa.ua',       'Олесенко Марія',        '+380930502017', 'Київ'),
-  ('andrushchak@pa.ua',           'Андрущак Сергій',       '+380632600827', 'Вінниця')
+  ('andrushchak@pa.ua',           'Андрущак Сергій',       '+380632600827', 'Вінниця'),
+  ('ihor.usatiuk@pa.ua',          'Усатюк Ігор',           null,            'Вінниця'),
+  ('valerii.prydryk@pa.ua',       'Придрик Валерій',       null,            'Хмельницький')
 on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial;
 
 -- Комерційна функція = адмін
-insert into public.pending_profiles (email, full_name, filial, position, role)
-values ('commerce@pa.ua', 'Комерційна функція', 'Вінниця', 'Комерційна функція', 'admin')
-on conflict (email) do update set role = 'admin', position = 'Комерційна функція';
+insert into public.pending_profiles (email, full_name, phone, filial, position, role)
+values ('commerce@pa.ua', 'Комерційна функція', '+380674334333', 'Вінниця', 'Комерційна функція', 'admin')
+on conflict (email) do update set role = 'admin', position = 'Комерційна функція', phone = excluded.phone;
 update public.profiles set role = 'admin', position = 'Комерційна функція' where lower(email) = 'commerce@pa.ua';
 
 -- Якщо акаунт уже існує, а профіль ще порожній — дозаповнити
