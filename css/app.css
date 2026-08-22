@@ -1,0 +1,173 @@
+/* Стилі калькулятора (з Калькулятор-КП.html v2.3) + навігація вебверсії */
+:root{--o:#FE5000;--g:#2D2926;--w:#fff;--bg:#F5F4F2;--line:#E3E0DC;--muted:#7A736D}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--g);font-size:14px;line-height:1.5}
+.wrap{max-width:1120px;margin:0 auto;padding:22px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.logo{font-weight:bold;font-size:15px;letter-spacing:.04em}.logo span{color:var(--o)}
+h1{font-size:22px;margin:0}
+.sub{color:var(--muted);font-size:12px}
+.card{background:var(--w);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+.card>h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--o);margin:0 0 14px;font-weight:bold}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+label.f{display:block;font-size:10px;font-weight:bold;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;font-size:14px;font-family:inherit;background:var(--w);color:var(--g)}
+input[type=file]{padding:6px;font-size:12px}
+input:focus,select:focus{outline:2px solid var(--o);outline-offset:-1px}
+.row{display:flex;gap:8px}.row input{flex:1}.row select{width:88px;flex:none}
+.hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;padding:9px 6px;border:0;background:var(--w);font-size:13px;font-family:inherit;cursor:pointer;color:var(--g)}
+.seg button.on{background:var(--o);color:var(--w);font-weight:bold}
+.adv{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}
+.advh{cursor:pointer;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:bold;user-select:none}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--w)}
+.kpi{padding:16px 18px;border-right:1px solid var(--line)}.kpi:last-child{border-right:0}
+.kpi .v{font-size:24px;font-weight:bold;line-height:1.15}.kpi .v.o{color:var(--o)}
+.kpi .l{font-size:11px;color:var(--muted);margin-top:4px}
+.hero{background:var(--o);color:var(--w);border-radius:10px;padding:22px 24px;margin-bottom:16px}
+.hero .p{font-size:34px;font-weight:bold;line-height:1.1}
+.hero .s{font-size:13px;opacity:.94;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--g);color:var(--w);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:9px;text-align:left;font-weight:bold}
+td{padding:8px 9px;border-bottom:1px solid var(--line)}
+tfoot td{font-weight:bold;background:#FDF1EA;border-top:2px solid var(--o)}
+.num{text-align:right}
+.spec td:first-child{color:var(--muted)}
+.spec td:last-child{text-align:right;font-weight:bold}
+.alert{padding:9px 12px;border-radius:6px;font-size:12.5px;margin-bottom:6px;line-height:1.45}
+.warn{background:#FFF4EC;color:#8A4A06;border-left:3px solid var(--o)}
+.ok{background:#F0F5F0;color:#3A5A3A;border-left:3px solid #5A8C5A}
+.disc{font-size:12px;color:var(--muted);line-height:1.55;margin-top:10px;padding-left:11px;border-left:3px solid var(--line)}
+.acc{display:inline-block;font-size:11px;font-weight:bold;padding:4px 11px;border-radius:20px}
+.acc.high{background:#E8F2E8;color:#2F6B33}.acc.medium{background:#FFF4EC;color:#8A4A06}.acc.low{background:#F1EFEC;color:#6A635D}
+.btn{background:var(--o);color:var(--w);border:0;padding:12px 26px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;font-family:inherit}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.g2{grid-template-columns:1fr}.kpi{border-right:0;border-bottom:1px solid var(--line)}}
+.chartbox{overflow-x:auto}
+.tip{position:fixed;background:var(--g);color:var(--w);padding:6px 10px;border-radius:5px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .1s;z-index:99;white-space:nowrap}
+.thumb{max-width:100%;max-height:130px;border-radius:6px;margin-top:8px;display:none}
+.hide{display:none}
+
+/* ---------------- друкована пропозиція ---------------- */
+#offer{display:none}
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+  html,body{background:#fff}
+  #app{display:none!important}#offer{display:block!important}
+  #offer .pg{box-shadow:none!important;margin:0!important}
+  @page{size:A4;margin:0}
+}
+#offer .pg{width:210mm;height:296mm;padding:15mm 16mm 22mm;background:var(--w);margin:0 auto 8mm;
+  position:relative;break-after:page;page-break-after:always;box-shadow:0 0 0 1px var(--line);overflow:hidden}
+#offer .pg:last-child{break-after:auto;page-break-after:auto;margin-bottom:0}
+#offer .band td{background:#F2F0ED;font-size:9.5px;font-weight:bold;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--o);padding:7px 8px;border-bottom:1px solid var(--line)}
+#offer .sp td:first-child{color:#7A736D}
+#offer .sp td:last-child{text-align:right;font-weight:bold}
+#offer .mtbl{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+#offer .mtbl table{font-size:11px}
+#offer .mtbl td{padding:4px 7px}
+#offer .mtbl th{padding:5px 7px}
+#offer .cap{font-size:9.5px;color:var(--muted);line-height:1.4;margin:3px 0 0;text-align:left}
+#offer h2{font-size:21px;margin:0 0 4px;color:var(--g)}
+#offer h3{font-size:12.5px;margin:12px 0 6px;color:var(--o);text-transform:uppercase;letter-spacing:.08em}
+#offer p{font-size:12.5px;line-height:1.6;margin:0 0 9px}
+#offer .lead{font-size:13.5px;line-height:1.68}
+#offer .rule{height:3px;background:var(--o);width:56px;margin:10px 0 16px}
+#offer .pnum{position:absolute;bottom:8mm;right:16mm;font-size:10px;color:var(--muted)}
+#offer .foot{position:absolute;bottom:8mm;left:16mm;font-size:10px;color:var(--muted)}
+#offer table{font-size:12px}
+#offer th{padding:7px 8px;background:var(--g)}
+#offer td{padding:6px 8px}
+#offer .box{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+#offer .obox{background:var(--o);color:#fff;border-radius:8px;padding:16px 20px}
+#offer .obox .big{font-size:34px;font-weight:bold;line-height:1.12}
+#offer .fine{font-size:10.5px;line-height:1.5;color:var(--muted)}
+#offer .note-big{font-size:12px;line-height:1.55;color:var(--o);font-weight:bold;margin-top:10px}
+
+#offer .cover{padding:0;display:flex;flex-direction:column;background:var(--o);color:#fff}
+#offer .cover .photo{height:112mm;background-color:#fff;background-position:center;background-repeat:no-repeat;flex:none}
+#offer .cover .body{flex:1;padding:13mm 16mm;display:flex;flex-direction:column;justify-content:space-between}
+#offer .cover h1{font-size:38px;line-height:1.06;margin:0}
+#offer .cover .meta{font-size:13px;line-height:1.85}
+#offer .cover .fine{color:rgba(255,255,255,.9)}
+#offer .cover .crule{height:3px;background:#fff;width:56px;margin:12px 0 20px}
+
+#offer .ck{list-style:none;padding:0;margin:0;font-size:12.5px;line-height:1.5}
+#offer .ck li{display:flex;gap:9px;padding:3px 0;align-items:baseline}
+#offer .ck .y{color:#2F8A3E;font-weight:bold;font-size:14px;min-width:13px}
+#offer .ck .n{color:#C4331F;font-weight:bold;font-size:14px;min-width:13px}
+
+#offer .nextpg{background:var(--o)!important;color:#fff;display:flex;flex-direction:column;justify-content:space-between}
+#offer .steps{list-style:none;padding:0;margin:14px 0 0}
+#offer .steps li{display:flex;gap:16px;align-items:baseline;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.4);font-size:13.5px}
+#offer .steps .n{font-weight:bold;color:rgba(255,255,255,.8);min-width:26px}
+#offer .steps .t{flex:1}
+#offer .steps .w{font-size:12px;opacity:.9;text-align:right}
+#offer .mgr{background:#fff;color:#2D2926;border-radius:8px;padding:14px 16px;font-size:12px;line-height:1.65}
+#offer .cities{font-size:12.5px;font-weight:bold;margin-top:14px}
+
+/* --- титул за референсом --- */
+#offer .cov{background:#fff;color:var(--g);display:flex;flex-direction:column;padding:14mm 14mm 12mm}
+#offer .lgrow{display:flex;justify-content:flex-end;align-items:center;gap:7px;font-size:9px}
+#offer .lg1{color:var(--o);font-weight:bold;letter-spacing:.02em}
+#offer .lg2{border:1.5px solid var(--o);color:var(--o);font-weight:bold;padding:3px 9px;letter-spacing:.06em;font-size:9.5px}
+#offer .bighead{font-size:48px;line-height:.98;font-weight:bold;color:var(--o);letter-spacing:-.01em;margin:7mm 0 0}
+#offer .covsub{font-size:14px;font-weight:bold;color:var(--g);margin-top:4mm}
+#offer .photoband{flex:1;min-height:98mm;margin:5mm 0 0;background-color:transparent;
+  background-position:center;background-repeat:no-repeat;background-size:contain}
+#offer .covbot{display:flex;gap:12mm;margin-top:5mm}
+#offer .kicker{font-size:9.5px;font-weight:bold;color:var(--o);text-transform:uppercase;letter-spacing:.12em}
+#offer .cname{font-size:19px;font-weight:bold;margin-top:4px;line-height:1.2}
+#offer .cline{font-size:11.5px;margin-top:4px;opacity:.85;line-height:1.5}
+#offer .cblurb{flex:1;font-size:10.5px;line-height:1.6;border-left:2px solid var(--o);padding-left:10px;opacity:.9}
+#offer .peach{background:#FDEADF;color:var(--g);display:flex;justify-content:space-between;
+  align-items:center;gap:10mm;padding:7mm 8mm;margin-top:6mm}
+#offer .pbig{font-size:23px;font-weight:bold;color:var(--o);line-height:1.15}
+#offer .pmeta{font-size:10px;line-height:1.6;text-align:right;opacity:.9}
+#offer .footline{margin-top:5mm;padding-top:5mm;border-top:2px solid var(--o);font-size:11px;font-weight:bold;letter-spacing:.02em}
+
+/* --- клієнти та цифри --- */
+#offer .clients{display:grid;grid-template-columns:repeat(4,1fr);gap:3.5mm}
+#offer .clogo{height:17mm;background:#F7F5F3;border:1px dashed var(--line);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);text-align:center;padding:3px}
+#offer .stats{display:grid;grid-template-columns:repeat(4,1fr);background:var(--o);color:#fff;
+  padding:6mm 5mm;margin-top:4mm}
+#offer .stat .n{font-size:27px;font-weight:bold;line-height:1}
+#offer .stat .c{font-size:10px;line-height:1.35;margin-top:5px;opacity:.92}
+
+/* --- реалізовані проєкти --- */
+#offer .projects{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:3mm}
+#offer .pcard{border:1px solid var(--line);border-radius:4px;padding:2.5mm}
+#offer .pph{height:17mm;background:#F7F5F3;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-size:9px;color:var(--muted)}
+#offer .pcard .t{font-size:10px;font-weight:bold;margin-top:2mm;line-height:1.2}
+#offer .pcard .p{font-size:10px;color:var(--o);font-weight:bold;margin:2px 0 0}
+#offer .combo{padding:0;display:flex;flex-direction:column}
+#offer .combo .topsec{padding:13mm 16mm 5mm}
+#offer .combo .botsec{margin-top:auto;background:var(--o)!important;color:#fff;padding:10mm 16mm 10mm}
+#offer .combo .botsec h2{color:inherit;font-size:27px;margin:0}
+#offer .combo .steps{margin:9px 0 0}
+#offer .combo .steps li{padding:8px 0;font-size:12.5px}
+
+/* ---------------- вебверсія: навігація, логін, адмін ---------------- */
+.nav{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--w);border-bottom:1px solid var(--line);padding:10px 22px;margin-bottom:6px}
+.nav .links{display:flex;gap:4px;flex:1}
+.nav .links a{padding:7px 12px;border-radius:6px;text-decoration:none;color:var(--g);font-size:13px}
+.nav .links a.on{background:var(--o);color:var(--w);font-weight:bold}
+.nav .who{font-size:12px;color:var(--muted)}
+.nav .who a{color:var(--o);margin-left:8px}
+.login{max-width:380px;margin:80px auto;background:var(--w);border:1px solid var(--line);border-radius:10px;padding:28px}
+.login h1{font-size:18px;margin:0 0 4px}
+.login .f{margin-top:14px}
+.login .btn{width:100%;margin-top:18px}
+.err{color:#C0392B;font-size:12.5px;margin-top:10px;min-height:16px}
+table.edit input{padding:6px 8px;font-size:13px;max-width:140px}
+.muted{color:var(--muted);font-size:12px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.toolbar input{width:auto}
+.badge{display:inline-block;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;background:#F1EFEC;color:#6A635D}
+.badge.admin{background:#FDEADF;color:var(--o)}
+.pending{opacity:.55}
+@media print{.nav{display:none!important}}

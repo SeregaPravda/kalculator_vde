@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промавтоматика · Лічильник КП</title>
+<link rel="stylesheet" href="css/app.css">
+</head><body>
+<div id="nav"></div>
+<div class="wrap">
+ <div class="top"><div><h1>Лічильник КП</h1>
+  <div class="sub">КП фіксується в момент натискання «PDF / Друк пропозиції» в калькуляторі.</div></div></div>
+ <div class="toolbar">
+  <label class="f" style="margin:0">Період</label>
+  <input type="date" id="from"> <span class="muted">—</span> <input type="date" id="to">
+  <button class="btn" style="padding:9px 14px;font-size:12px" id="apply">Показати</button>
+  <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="month">Цей місяць</button>
+  <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="all">Весь час</button>
+ </div>
+ <div class="kpis" id="kpis"></div>
+ <div style="height:16px"></div>
+ <div class="card"><h2>По менеджерах</h2>
+  <table id="stat"><thead><tr><th>Менеджер</th><th>Філія</th><th class="num">КП, шт</th><th class="num">Сума СЕС, $</th><th class="num">Сума УЗЕ, €</th><th>Останнє КП</th></tr></thead><tbody></tbody></table>
+ </div>
+ <div class="card"><h2>Останні КП</h2>
+  <table id="log"><thead><tr><th>Дата</th><th>Менеджер</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">АКБ, кВт·год</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th></tr></thead><tbody></tbody></table>
+  <div class="muted" id="logNote" style="margin-top:8px"></div>
+ </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const TYPE = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
+const $ = i => document.getElementById(i);
+function range() {
+  const f = $("from").value ? new Date($("from").value).toISOString() : null;
+  const t = $("to").value ? new Date(new Date($("to").value).getTime() + 86400000).toISOString() : null;
+  return { f, t };
+}
+async function load() {
+  const { f, t } = range();
+  const s = await sb.rpc("kp_stats", { date_from: f, date_to: t });
+  if (s.error) { $("stat").querySelector("tbody").innerHTML = `<tr><td colspan="6">${esc(s.error.message)}</td></tr>`; return; }
+  const rows = s.data;
+  const total = rows.reduce((a, r) => a + Number(r.kp_count), 0);
+  const usd = rows.reduce((a, r) => a + Number(r.sum_usd), 0);
+  const eur = rows.reduce((a, r) => a + Number(r.sum_uze_eur), 0);
+  $("kpis").innerHTML = [[nf(total), "КП за період", "o"], [nf(usd), "Сума СЕС, $", ""], [nf(eur), "Сума УЗЕ, €", ""],
+    [nf(rows.filter(r => Number(r.kp_count) > 0).length), "Активних менеджерів", "o"]]
+    .map(k => `<div class="kpi"><div class="v ${k[2]}">${k[0]}</div><div class="l">${k[1]}</div></div>`).join("");
+  $("stat").querySelector("tbody").innerHTML = rows.map(r => `<tr><td>${esc(r.full_name)}</td><td>${esc(r.filial)}</td>
+    <td class="num"><b>${nf(r.kp_count)}</b></td><td class="num">${nf(r.sum_usd)}</td><td class="num">${nf(r.sum_uze_eur)}</td>
+    <td>${r.last_at ? fmtDate(r.last_at) : "—"}</td></tr>`).join("") || "<tr><td colspan='6'>Немає даних</td></tr>";
+
+  let q = sb.from("kp_log").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(200);
+  if (f) q = q.gte("created_at", f); if (t) q = q.lt("created_at", t);
+  const l = await q;
+  if (l.error) { $("logNote").textContent = l.error.message; return; }
+  $("log").querySelector("tbody").innerHTML = l.data.map(r => `<tr><td>${fmtDate(r.created_at)}</td>
+    <td>${esc(r.profiles && r.profiles.full_name)}</td><td>${esc(r.client_name)}</td><td>${esc(r.kp_number)}</td>
+    <td>${TYPE[r.system_type] || esc(r.system_type)}</td><td class="num">${nf(r.installed_dc_kwp, 1)}</td>
+    <td class="num">${nf(r.battery_kwh, 1)}</td><td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td></tr>`).join("")
+    || "<tr><td colspan='9'>Немає КП за період</td></tr>";
+  $("logNote").textContent = l.data.length >= 200 ? "Показано останні 200 записів." : "";
+}
+(async () => {
+  const a = await requireAuth("admin"); if (!a) return;
+  const d = new Date(); $("from").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  $("apply").onclick = load;
+  document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
+    if (b.dataset.q === "all") { $("from").value = ""; $("to").value = ""; }
+    else { $("from").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; $("to").value = ""; }
+    load(); });
+  await load();
+})();
+</script>
+</body></html>

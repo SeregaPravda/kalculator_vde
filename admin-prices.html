@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промавтоматика · Ціни</title>
+<link rel="stylesheet" href="css/app.css">
+</head><body>
+<div id="nav"></div>
+<div class="wrap">
+ <div class="top"><div><h1>Цінова матриця</h1>
+  <div class="sub">Ставки в $ за кВт поля і за кВт·год накопичення. Змінюються тут — і одразу діють для всіх менеджерів.</div></div>
+  <button class="btn" id="save">Зберегти зміни</button></div>
+ <div id="msg"></div>
+
+ <div class="g2">
+  <div class="card"><h2>PV-частина, $/кВт</h2>
+   <div class="muted" style="margin-bottom:8px">Сегменти потужності поля: до 30 кВт включно · від 30 до 100 · від 100 кВт.</div>
+   <table class="edit" id="pvTbl"><thead><tr><th>Тип</th><th>Місце</th><th>Сегмент</th><th class="num">$/кВт</th><th>Оновлено</th></tr></thead><tbody></tbody></table>
+  </div>
+  <div class="card"><h2>Накопичення (АКБ гібридної), $/кВт·год</h2>
+   <div class="muted" style="margin-bottom:8px">Сегменти ємності: до 30 кВт·год включно · від 30 до 100 · від 100. Не залежить від даху/землі.</div>
+   <table class="edit" id="batTbl"><thead><tr><th>Сегмент</th><th class="num">$/кВт·год</th><th>Оновлено</th></tr></thead><tbody></tbody></table>
+   <div class="disc" style="margin-top:14px">Ставки накопичення — плейсхолдер, виведений зворотним рахунком зі старої матриці (1 кВт·год на 1 кВт поля). Підлягають підтвердженню комерційною функцією.</div>
+  </div>
+ </div>
+ <div class="card"><h2>Перевірка</h2>
+  <div class="muted">Приклад: мережева, дах, 120 кВт → сегмент large → 120 × <span id="chk">…</span> $</div>
+ </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const TYPE = { network: "Мережева", hybrid: "Гібридна" }, PLACE = { roof: "Дах", ground: "Земля" },
+      SEG = { small: "до 30", medium: "30–100", large: "від 100" };
+const ORDER = { network: 0, hybrid: 1, small: 0, medium: 1, large: 2, roof: 0, ground: 1 };
+let PV = [], BAT = [], ME = null;
+
+async function load() {
+  const a = await sb.from("pv_prices").select("*"), b = await sb.from("battery_prices").select("*");
+  if (a.error || b.error) { msg((a.error || b.error).message, true); return; }
+  PV = a.data.sort((x, y) => ORDER[x.system_type] - ORDER[y.system_type] || ORDER[x.power_segment] - ORDER[y.power_segment] || ORDER[x.placement] - ORDER[y.placement]);
+  BAT = b.data.sort((x, y) => ORDER[x.capacity_segment] - ORDER[y.capacity_segment]);
+  document.querySelector("#pvTbl tbody").innerHTML = PV.map(r => `<tr>
+    <td>${TYPE[r.system_type]}</td><td>${PLACE[r.placement]}</td><td>${SEG[r.power_segment]} кВт</td>
+    <td class="num"><input type="number" step="1" min="0" data-pv="${r.id}" value="${r.rate_usd_per_kwp}"></td>
+    <td class="muted">${r.updated_at ? fmtDate(r.updated_at) : ""}</td></tr>`).join("");
+  document.querySelector("#batTbl tbody").innerHTML = BAT.map(r => `<tr>
+    <td>${SEG[r.capacity_segment]} кВт·год</td>
+    <td class="num"><input type="number" step="1" min="0" data-bat="${r.id}" value="${r.rate_usd_per_kwh}"></td>
+    <td class="muted">${r.updated_at ? fmtDate(r.updated_at) : ""}</td></tr>`).join("");
+  const l = PV.find(r => r.system_type === "network" && r.placement === "roof" && r.power_segment === "large");
+  document.getElementById("chk").textContent = l ? `${l.rate_usd_per_kwp} = ${nf(120 * l.rate_usd_per_kwp)}` : "—";
+}
+function msg(t, bad) { document.getElementById("msg").innerHTML = t ? `<div class="alert ${bad ? "warn" : "ok"}">${esc(t)}</div>` : ""; }
+
+async function save() {
+  const btn = document.getElementById("save"); btn.disabled = true; msg("");
+  const now = new Date().toISOString(); const errs = [];
+  for (const inp of document.querySelectorAll("input[data-pv]")) {
+    const row = PV.find(r => r.id == inp.dataset.pv), v = Number(inp.value);
+    if (!(v > 0)) { errs.push("Ставка має бути > 0"); continue; }
+    if (v === Number(row.rate_usd_per_kwp)) continue;
+    const { error } = await sb.from("pv_prices").update({ rate_usd_per_kwp: v, updated_at: now, updated_by: ME.id }).eq("id", row.id);
+    if (error) errs.push(error.message);
+  }
+  for (const inp of document.querySelectorAll("input[data-bat]")) {
+    const row = BAT.find(r => r.id == inp.dataset.bat), v = Number(inp.value);
+    if (!(v > 0)) { errs.push("Ставка має бути > 0"); continue; }
+    if (v === Number(row.rate_usd_per_kwh)) continue;
+    const { error } = await sb.from("battery_prices").update({ rate_usd_per_kwh: v, updated_at: now, updated_by: ME.id }).eq("id", row.id);
+    if (error) errs.push(error.message);
+  }
+  await load();
+  msg(errs.length ? errs.join("; ") : "Збережено.", errs.length > 0);
+  btn.disabled = false;
+}
+(async () => {
+  const a = await requireAuth("admin"); if (!a) return; ME = a.profile;
+  document.getElementById("save").onclick = save;
+  await load();
+})();
+</script>
+</body></html>

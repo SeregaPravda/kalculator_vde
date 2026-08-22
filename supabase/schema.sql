@@ -1,0 +1,262 @@
+-- ============================================================================
+-- Промавтоматика · Калькулятор індикативних КП · схема Supabase
+-- Версія 1.0 · 22.08.2026
+-- Виконати ОДИН раз у Supabase → SQL Editor (увесь файл цілком).
+-- Повторний запуск безпечний: усе створюється з "if not exists" / "on conflict".
+-- ============================================================================
+
+create extension if not exists pgcrypto;
+
+-- ---------------------------------------------------------------- ПРОФІЛІ
+create table if not exists public.profiles (
+  id          uuid primary key references auth.users(id) on delete cascade,
+  full_name   text not null default '',
+  position    text default 'Менеджер напрямку ВДЕ',
+  phone       text,
+  email       text,
+  filial      text not null default 'Вінниця',
+  role        text not null default 'manager' check (role in ('manager','admin')),
+  created_at  timestamptz default now()
+);
+
+-- Профіль створюється автоматично для кожного нового користувача Auth.
+-- Адмін потім дописує ПІБ/телефон/філію на сторінці «Користувачі» сайту.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Хелпер для політик: чи є поточний користувач адміном.
+-- security definer → читає profiles в обхід RLS, щоб не було рекурсії політик.
+create or replace function public.is_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+$$;
+
+-- ------------------------------------------------------------------- ЦІНИ
+create table if not exists public.pv_prices (
+  id               serial primary key,
+  system_type      text not null check (system_type in ('network','hybrid')),
+  placement        text not null check (placement in ('roof','ground')),
+  power_segment    text not null check (power_segment in ('small','medium','large')),
+  rate_usd_per_kwp numeric not null,
+  updated_at       timestamptz default now(),
+  updated_by       uuid references public.profiles(id),
+  unique (system_type, placement, power_segment)
+);
+
+create table if not exists public.battery_prices (
+  id               serial primary key,
+  capacity_segment text not null unique check (capacity_segment in ('small','medium','large')),
+  rate_usd_per_kwh numeric not null,
+  updated_at       timestamptz default now(),
+  updated_by       uuid references public.profiles(id)
+);
+
+-- ----------------------------------------------------------- ЛІЧИЛЬНИК КП
+create table if not exists public.kp_log (
+  id               bigserial primary key,
+  manager_id       uuid not null references public.profiles(id),
+  created_at       timestamptz default now(),
+  system_type      text not null,
+  placement        text,
+  installed_dc_kwp numeric,
+  battery_kwh      numeric,
+  total_price_usd  numeric not null default 0,
+  uze_id           text,
+  uze_qty          integer,
+  uze_total_eur    numeric,
+  client_name      text,
+  city             text,
+  kp_number        text
+);
+create index if not exists kp_log_manager_idx on public.kp_log (manager_id, created_at desc);
+
+-- ------------------------------------------------------------- СТАРТОВІ ЦІНИ
+-- Значення 1:1 з calc_engine.js v2.0 (PRICE_PER_KWP_USD, BATTERY_PRICE_PER_KWH_USD)
+insert into public.pv_prices (system_type, placement, power_segment, rate_usd_per_kwp) values
+  ('network','roof','small',420), ('network','ground','small',450),
+  ('network','roof','medium',390), ('network','ground','medium',430),
+  ('network','roof','large',380), ('network','ground','large',420),
+  ('hybrid','roof','small',420),  ('hybrid','ground','small',450),
+  ('hybrid','roof','medium',390), ('hybrid','ground','medium',430),
+  ('hybrid','roof','large',380),  ('hybrid','ground','large',420)
+on conflict (system_type, placement, power_segment) do nothing;
+
+insert into public.battery_prices (capacity_segment, rate_usd_per_kwh) values
+  ('small',460), ('medium',430), ('large',400)
+on conflict (capacity_segment) do nothing;
+
+-- --------------------------------------------------------------------- RLS
+alter table public.profiles       enable row level security;
+alter table public.pv_prices      enable row level security;
+alter table public.battery_prices enable row level security;
+alter table public.kp_log         enable row level security;
+
+-- profiles: менеджер читає тільки себе; адмін — читає і пише все
+drop policy if exists profiles_select on public.profiles;
+create policy profiles_select on public.profiles for select
+  using (id = auth.uid() or public.is_admin());
+drop policy if exists profiles_admin_write on public.profiles;
+create policy profiles_admin_write on public.profiles for all
+  using (public.is_admin()) with check (public.is_admin());
+
+-- ціни: прямого доступу в менеджера НЕМАЄ. Тільки адмін.
+drop policy if exists pv_prices_admin on public.pv_prices;
+create policy pv_prices_admin on public.pv_prices for all
+  using (public.is_admin()) with check (public.is_admin());
+drop policy if exists battery_prices_admin on public.battery_prices;
+create policy battery_prices_admin on public.battery_prices for all
+  using (public.is_admin()) with check (public.is_admin());
+
+-- kp_log: читання — свої рядки або адмін; вставка — тільки через RPC (політики insert немає)
+drop policy if exists kp_log_select on public.kp_log;
+create policy kp_log_select on public.kp_log for select
+  using (manager_id = auth.uid() or public.is_admin());
+drop policy if exists kp_log_admin_delete on public.kp_log;
+create policy kp_log_admin_delete on public.kp_log for delete
+  using (public.is_admin());
+
+-- ------------------------------------------------------------ RPC: РОЗРАХУНОК
+-- Єдина точка, де ставки торкаються розрахунку. Менеджер отримує тільки підсумки.
+-- p = {
+--   system_type: 'network'|'hybrid'|'bess', placement: 'roof'|'ground',
+--   installed_dc_kwp, battery_kwh,
+--   uze_id, uze_qty, uze_total_eur   (УЗЕ рахується в браузері, тут лише для логу)
+--   client_name, city, kp_number
+-- }
+-- do_log = true → одночасно пише рядок у kp_log (викликається при друку КП)
+create or replace function public.calculate_quote(p jsonb, do_log boolean default false)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  uid        uuid := auth.uid();
+  adm        boolean;
+  st         text := p->>'system_type';
+  pl         text := p->>'placement';
+  kwp        numeric := coalesce((p->>'installed_dc_kwp')::numeric, 0);
+  kwh        numeric := coalesce((p->>'battery_kwh')::numeric, 0);
+  pcat       text; bcat text;
+  rate_a     numeric := 0; rate_b numeric := 0;
+  pv_usd     numeric := 0; bat_usd numeric := 0; total_usd numeric := 0;
+  u_id       text := p->>'uze_id';
+  u_qty      integer := coalesce((p->>'uze_qty')::integer, 0);
+  u_total    numeric := (p->>'uze_total_eur')::numeric;
+  res        jsonb;
+begin
+  if uid is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+  adm := public.is_admin();
+
+  -- ---- СЕС: PV + накопичення
+  if st in ('network','hybrid') and kwp > 0 then
+    if pl not in ('roof','ground') then
+      raise exception 'placement must be roof|ground';
+    end if;
+    pcat := case when kwp <= 30 then 'small' when kwp < 100 then 'medium' else 'large' end;
+    select rate_usd_per_kwp into rate_a from public.pv_prices
+      where system_type = st and placement = pl and power_segment = pcat;
+    if rate_a is null then
+      raise exception 'no pv price for %/%/%', st, pl, pcat;
+    end if;
+    pv_usd := kwp * rate_a;
+
+    if st = 'hybrid' and kwh > 0 then
+      bcat := case when kwh <= 30 then 'small' when kwh < 100 then 'medium' else 'large' end;
+      select rate_usd_per_kwh into rate_b from public.battery_prices where capacity_segment = bcat;
+      if rate_b is null then
+        raise exception 'no battery price for %', bcat;
+      end if;
+      bat_usd := kwh * rate_b;
+    else
+      kwh := 0;
+    end if;
+    total_usd := round(pv_usd + bat_usd);
+  else
+    kwp := 0; kwh := 0;
+  end if;
+
+  -- ---- лог
+  if do_log then
+    insert into public.kp_log (manager_id, system_type, placement, installed_dc_kwp, battery_kwh,
+                               total_price_usd, uze_id, uze_qty, uze_total_eur,
+                               client_name, city, kp_number)
+    values (uid, coalesce(st, '?'), pl, nullif(kwp, 0), nullif(kwh, 0),
+            total_usd, u_id, nullif(u_qty, 0), u_total,
+            p->>'client_name', p->>'city', p->>'kp_number');
+  end if;
+
+  res := jsonb_build_object(
+    'total_price_usd', total_usd,
+    'pv_kwp', kwp, 'battery_kwh', kwh,
+    'vat_included', true,
+    'is_admin', adm,
+    'logged', do_log
+  );
+  -- Розбивку і ставки бачить тільки адмін
+  if adm then
+    res := res || jsonb_build_object('breakdown', jsonb_build_object(
+      'power_segment', pcat, 'rate_usd_per_kwp', rate_a, 'pv_price_usd', round(pv_usd),
+      'battery_segment', bcat, 'rate_usd_per_kwh', rate_b, 'battery_price_usd', round(bat_usd)
+    ));
+  end if;
+  return res;
+end $$;
+
+revoke all on function public.calculate_quote(jsonb, boolean) from public, anon;
+grant execute on function public.calculate_quote(jsonb, boolean) to authenticated;
+
+-- ---------------------------------------------------- ДАШБОРД: зведення по менеджерах
+create or replace function public.kp_stats(date_from timestamptz default null, date_to timestamptz default null)
+returns table (manager_id uuid, full_name text, filial text, kp_count bigint,
+               sum_usd numeric, sum_uze_eur numeric, last_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select pr.id, pr.full_name, pr.filial,
+         count(k.id), coalesce(sum(k.total_price_usd),0), coalesce(sum(k.uze_total_eur),0), max(k.created_at)
+  from public.profiles pr
+  left join public.kp_log k on k.manager_id = pr.id
+       and (date_from is null or k.created_at >= date_from)
+       and (date_to   is null or k.created_at <  date_to)
+  where public.is_admin()
+  group by pr.id, pr.full_name, pr.filial
+  order by count(k.id) desc, pr.full_name
+$$;
+revoke all on function public.kp_stats(timestamptz, timestamptz) from public, anon;
+grant execute on function public.kp_stats(timestamptz, timestamptz) to authenticated;
+
+-- ------------------------------------------------------------ ПЕРШИЙ АДМІН
+-- Створює користувача admin@admin / admin і робить його адміном.
+-- ОБОВ'ЯЗКОВО змініть пароль після першого входу (Supabase → Authentication → Users).
+do $$
+declare new_id uuid := gen_random_uuid();
+begin
+  if not exists (select 1 from auth.users where email = 'admin@admin') then
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+                            email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+                            created_at, updated_at, confirmation_token, recovery_token,
+                            email_change_token_new, email_change)
+    values ('00000000-0000-0000-0000-000000000000', new_id, 'authenticated', 'authenticated',
+            'admin@admin', crypt('admin', gen_salt('bf')), now(),
+            '{"provider":"email","providers":["email"]}', '{"full_name":"admin"}',
+            now(), now(), '', '', '', '');
+    insert into auth.identities (id, user_id, provider_id, provider, identity_data, last_sign_in_at, created_at, updated_at)
+    values (gen_random_uuid(), new_id, 'admin@admin', 'email',
+            jsonb_build_object('sub', new_id::text, 'email', 'admin@admin', 'email_verified', true),
+            now(), now(), now());
+  end if;
+end $$;
+
+update public.profiles set
+  role = 'admin', full_name = 'admin', position = 'Адміністратор',
+  filial = 'Вінниця', phone = '+380674334333', email = 'admin@admin'
+where id = (select id from auth.users where email = 'admin@admin');

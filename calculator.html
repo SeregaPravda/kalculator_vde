@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промавтоматика · Калькулятор індикативних КП</title>
+<link rel="stylesheet" href="css/app.css">
+</head><body>
+<div id="nav"></div>
+<div id="app"><div class="wrap">
+<div class="top">
+  <div><h1>Калькулятор індикативних КП</h1>
+       <div class="sub">Орієнтовний розрахунок генерації та вартості СЕС · вебверсія 3.0</div></div>
+  <button class="btn" onclick="printOffer()">PDF / Друк пропозиції</button>
+</div>
+
+<div class="card"><h2>Параметри станції</h2>
+ <div class="grid">
+  <div><label class="f">Тип станції</label>
+    <div class="seg" id="segType"><button data-v="network" class="on">Мережева</button><button data-v="hybrid">Гібридна</button><button data-v="bess">BESS</button></div></div>
+  <div class="pvonly"><label class="f">Місце встановлення</label>
+    <div class="seg" id="segPlace"><button data-v="roof" class="on">Дах</button><button data-v="ground">Земля</button></div></div>
+  <div class="pvonly"><label class="f">Потужність по полю (модулі), кВт</label>
+    <div class="row"><input type="number" id="fDc" value="120" min="0.1" step="any">
+      <select id="fUnit"><option value="kWp">кВт</option><option value="MW">МВт</option></select></div>
+    <div class="hint">Сумарна потужність фотомодулів. За нею рахується вартість.</div></div>
+  <div class="pvonly"><label class="f">Потужність по інвертору, кВт</label>
+    <div class="row"><input type="number" id="fAc" value="100" min="0.1" step="any">
+      <button class="btn" style="padding:9px 12px;font-size:12px" onclick="autoAc()">Авто</button></div>
+    <div class="hint" id="acHint"></div></div>
+  <div class="hybonly hide"><label class="f">Ємність АКБ, кВт·год</label>
+    <input type="number" id="fBatKwh" value="50" min="0" step="any">
+    <div class="hint" id="batHint"></div></div>
+  <div class="pvonly"><label class="f">Фотомодуль</label><select id="fPanel"></select>
+    <div class="hint" id="panHint"></div></div>
+  <div class="pvonly"><label class="f">Тариф на е/е, грн/кВт·год</label><input type="number" id="fTariff" value="8" step="0.01"></div>
+  <div class="pvonly"><label class="f">Додати систему накопичення</label>
+    <div class="seg" id="segUze"><button data-v="no" class="on">Без УЗЕ</button><button data-v="yes">Додати УЗЕ</button></div></div>
+  <div class="uzeonly hide"><label class="f">Тип рішення УЗЕ</label><select id="fUzeKind"></select></div>
+  <div class="uzeonly hide"><label class="f">УЗЕ — модель</label><select id="fUze"></select>
+    <div class="hint" id="uzeHint"></div></div>
+  <div class="uzeonly hide"><label class="f">Цільова ємність УЗЕ, кВт·год</label>
+    <input type="number" id="fUzeKwh" value="261" min="0" step="any"></div>
+  <div><label class="f">Фото для титульної сторінки</label>
+    <input type="file" id="fPhoto" accept="image/*">
+    <img id="photoThumb" class="thumb"><div class="hint">За замовчуванням стоїть стандартне фото.
+    <a href="#" id="resetPhoto" style="color:var(--o)">Повернути стандартне</a></div></div>
+ </div>
+
+ <div class="adv"><div class="advh" onclick="toggleAdv()">▸ Обладнання та додаткові параметри</div>
+  <div id="advBox" style="display:none;margin-top:14px">
+   <div class="grid">
+    <div class="pvonly"><label class="f">Інвертор — модель</label><select id="fInvModel"></select></div>
+    <div class="pvonly"><label class="f">Потужність одного інвертора, кВт AC</label><input type="number" id="fInvKw" step="any"></div>
+    <div class="pvonly"><label class="f">Кількість інверторів</label><input type="number" id="fInvQty" min="1" step="1"></div>
+    <div><label class="f">Посилання на відеовідгуки</label>
+      <input id="mVideo" placeholder="необов'язково, з'явиться на останній сторінці"></div>
+    <div class="hybonly hide"><label class="f">Резервоване навантаження, кВт</label>
+      <input type="number" id="fBackup" value="0" min="0" step="any" placeholder="за замовчуванням = інвертор">
+      <div class="hint">Довідково: показує, чи вистачить ємності для повного резерву</div></div>
+    <div class="pvonly"><label class="f">ККД інвертора</label><input type="number" id="fEff" value="0.98" min="0.5" max="1" step="0.001"></div>
+    <div class="pvonly"><label class="f">Ліміт видачі в мережу, кВт</label><input type="number" id="fExport" placeholder="не обмежено" step="any"></div>
+    <div class="pvonly"><label class="f">Кут нахилу, °</label><input type="number" id="fTilt" value="30" step="1"></div>
+    <div class="pvonly"><label class="f">Азимут, ° (0 = південь)</label><input type="number" id="fAz" value="0" step="1"></div>
+    <div class="pvonly"><label class="f">Курс, грн/$</label><input type="number" id="fFx" value="44.80" step="0.01"></div>
+    <div class="uzeonly hide"><label class="f">Курс, грн/€</label><input type="number" id="fFxEur" value="48.50" step="0.01"></div>
+    <div class="uzeonly hide"><label class="f">Коефіцієнт до ціни постачальника УЗЕ</label>
+      <input type="number" id="fUzeK" value="1.00" min="1" step="0.01">
+      <div class="hint">1,00 = ціна постачальника без націнки. Для позицій FCA логістика й розмитнення не включені.</div></div>
+    <div class="pvonly"><label class="f">Горизонт окупності, років</label><input type="number" id="fYears" value="10" min="3" max="25" step="1"></div>
+    <div class="pvonly"><label class="f">Режим профілю</label><select id="fMode">
+      <option value="hourly">Погодинний (з оцінкою кліпінгу)</option>
+      <option value="monthly">Тільки місячний</option></select></div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<div class="hero"><div class="p" id="heroPrice">—</div><div class="s" id="heroSub">—</div></div>
+<div class="kpis" id="kpis"></div>
+<div style="height:16px"></div>
+<div id="warnBox"></div>
+
+<div class="card pvonly"><h2>Генерація по місяцях</h2>
+ <div style="font-size:12px;color:var(--muted);margin-bottom:6px">кВт·год за місяць</div>
+ <div class="chartbox"><div id="chart"></div></div>
+ <div style="margin-top:10px"><span class="acc" id="accBadge"></span></div>
+ <div class="disc" id="calcDisc"></div>
+</div>
+
+<div class="card pvonly"><h2>Графік окупності</h2>
+ <div style="font-size:12px;color:var(--muted);margin-bottom:6px">накопичений фінансовий результат, грн</div>
+ <div class="chartbox"><div id="payChart"></div></div>
+</div>
+
+<div class="g2">
+ <div class="card"><h2>Конфігурація</h2><table class="spec" id="cfgTbl"></table></div>
+ <div class="card"><h2>Вартість і окупність</h2><table class="spec" id="ecoTbl"></table>
+   <div class="disc" id="priceDisc"></div></div>
+</div>
+
+<div class="card"><h2>Дані для пропозиції</h2>
+ <div class="grid">
+  <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
+  <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
+  <div><label class="f">Номер КП</label><input id="mDoc" placeholder="напр. 2026-0815"></div>
+  <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
+ </div>
+ <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
+</div>
+
+<div class="card"><h2>Цифри компанії для 2-ї сторінки</h2>
+ <div class="grid">
+  <div><label class="f">Років на ринку</label><input id="sYears" value="26"></div>
+  <div><label class="f">Філій</label><input id="sBranch" value="5"></div>
+  <div><label class="f">Реалізованих промислових об'єктів</label><input id="sObj" value="600+"></div>
+  <div><label class="f">У портфелі, МВт</label><input id="sMw" value="50"></div>
+ </div>
+ <div class="hint" style="margin-top:10px">Логотипи клієнтів на 2-й сторінці — це рамки-заглушки.
+  Ставити туди реальні знаки можна лише за письмової згоди клієнта: чужа торговельна марка
+  в рекламному матеріалі без дозволу — це юридичний і репутаційний ризик. Безпечна альтернатива —
+  описи без назв: «агрохолдинг, 400 кВт».</div>
+</div>
+
+<div class="card"><h2>Мої останні КП</h2>
+ <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th></tr></thead><tbody></tbody></table>
+ <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції».</div>
+</div>
+
+<div style="text-align:center;padding:6px 0 30px">
+  <button class="btn" onclick="printOffer()">PDF / Друк пропозиції</button></div>
+</div></div>
+
+<div id="offer"></div>
+<div class="tip" id="tip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/calc_engine.js"></script>
+<script src="js/data.js"></script>
+<script src="js/photo.js"></script>
+<script>
+const $ = i => document.getElementById(i);
+const S = { type: "network", place: "roof", addUze: "no" };
+let ME = null;            // профіль менеджера з Supabase
+let IS_ADMIN = false;
+
+/* Правило підбору модуля: наземні станції до 500 кВт — 615–620 Вт;
+   від 500 кВт — 710–715 Вт. Менеджер може змінити вручну. */
+function autoPanel(kwp) { return kwp >= 500 ? D.panels[0] : D.panels[1]; }
+let manualPanel = false;
+function fillPanels(sel) {
+  $("fPanel").innerHTML = D.panels.map(p =>
+    `<option value="${p.w}"${p.w === sel ? " selected" : ""}>${p.model} · ${p.w} Вт</option>`).join("");
+}
+let PHOTO = DEFAULT_PHOTO, PHOTO_FIT = "contain", manualInv = false;
+
+function seg(id, key) {
+  $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
+    $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); S[key] = b.dataset.v;
+    syncVisibility();
+    if (S.type === "bess") { fillUze(); run(); return; }
+    manualInv = false; manualPanel = false; autoAc(); });
+}
+function syncVisibility() {
+  const isB = S.type === "bess", isH = S.type === "hybrid";
+  const uzeOn = isB || S.addUze === "yes";
+  document.querySelectorAll(".pvonly").forEach(e => e.classList.toggle("hide", isB));
+  document.querySelectorAll(".hybonly").forEach(e => e.classList.toggle("hide", !isH));
+  document.querySelectorAll(".uzeonly").forEach(e => e.classList.toggle("hide", !uzeOn));
+}
+const uzeActive = () => S.type === "bess" || S.addUze === "yes";
+function fillUze() {
+  const kinds = [...new Set(D.uze.map(u => u.kind))];
+  if (!$("fUzeKind").options.length)
+    $("fUzeKind").innerHTML = kinds.map(k => `<option>${k}</option>`).join("");
+  const list = D.uze.filter(u => u.kind === $("fUzeKind").value);
+  const cur = $("fUze").value;
+  $("fUze").innerHTML = list.map(u =>
+    `<option value="${u.id}">${u.brand} ${u.model} · ${u.kw} кВт / ${u.kwh} кВт·год</option>`).join("");
+  if (list.some(u => u.id === cur)) $("fUze").value = cur;
+}
+const curUze = () => D.uze.find(u => u.id === $("fUze").value) || D.uze[0];
+const toggleAdv = () => { const b = $("advBox"); b.style.display = b.style.display === "none" ? "block" : "none"; };
+
+const pool = () => D.inv.filter(i => i.type === (S.type === "hybrid" ? "Гібридний" : "Мережевий"));
+function pickForAc(t) {
+  const p = pool().slice().sort((a, b) => a.ac - b.ac); let best = null, bs = 1e9;
+  for (const i of p) for (const q of [Math.floor(t / i.ac), Math.ceil(t / i.ac)]) {
+    if (q < 1 || q > 10) continue;
+    const sc = Math.abs(q * i.ac - t) / Math.max(t, 1) + q * 0.02;
+    if (sc < bs) { bs = sc; best = { inv: i, qty: q }; } }
+  if (!best) { const i = p[p.length - 1]; best = { inv: i, qty: Math.max(1, Math.round(t / i.ac)) }; }
+  return best;
+}
+function autoPickDc(kwp) {
+  const p = pool().slice().sort((a, b) => a.ac - b.ac); let best = null, bs = 1e9;
+  for (const i of p) {
+    const q = Math.max(1, Math.ceil(kwp / 1.25 / i.ac)); if (q > 10) continue;
+    const r = kwp / (q * i.ac); if (r > 1.35) continue;
+    const off = r < 1.05 ? 1.05 - r : (r > 1.25 ? r - 1.25 : 0);
+    const sc = off + q * 0.04; if (sc < bs) { bs = sc; best = { inv: i, qty: q }; } }
+  if (!best) { const i = p[p.length - 1]; best = { inv: i, qty: Math.ceil(kwp / 1.15 / i.ac) }; }
+  return best;
+}
+function autoAc() {
+  const a = autoPickDc(toKwp($("fDc").value, $("fUnit").value) || 1);
+  $("fAc").value = +(a.qty * a.inv.ac).toFixed(1); manualInv = false; run();
+}
+const fillModels = sel => $("fInvModel").innerHTML =
+  pool().map(i => `<option${i.model === sel ? " selected" : ""}>${i.model}</option>`).join("");
+
+/* ------------------------------------------------------------------
+   ЦІНА: рахується на сервері (Supabase RPC calculate_quote).
+   Менеджер отримує тільки підсумок; адмін — ще й розбивку зі ставками.
+   ------------------------------------------------------------------ */
+let R = null, PR = null, CFG = null, PRICE_PENDING = false, priceTimer = null, priceSeq = 0;
+
+function quoteParams() {
+  return {
+    system_type: S.type, placement: S.place,
+    installed_dc_kwp: CFG.kwp, battery_kwh: CFG.BAT ? CFG.BAT.totalKwh : 0,
+    uze_id: CFG.UZ && CFG.UZ.qty ? CFG.UZ.id : null,
+    uze_qty: CFG.UZ && CFG.UZ.qty ? CFG.UZ.qty : null,
+    uze_total_eur: CFG.UZ && CFG.UZ.qty ? CFG.UZ.totalEur : null,
+    client_name: $("mClient").value, city: $("mCity").value, kp_number: $("mDoc").value
+  };
+}
+function applyQuote(q) {
+  if (S.type === "bess" || !(CFG.kwp > 0)) { PR = null; return; }
+  const b = q.breakdown || null;
+  PR = { estimatedTotalPriceUsd: Number(q.total_price_usd),
+         pvPriceUsd: b ? Number(b.pv_price_usd) : null, pricePerKwpUsd: b ? Number(b.rate_usd_per_kwp) : null,
+         batteryPriceUsd: b ? Number(b.battery_price_usd) : null, pricePerKwhUsd: b ? Number(b.rate_usd_per_kwh) : null,
+         powerCategory: b ? b.power_segment : null, batteryCategory: b ? b.battery_segment : null,
+         vatIncluded: true, disclaimer: PRICE_DISCLAIMER };
+}
+function applyEconomics() {
+  CFG.uah = PR ? PR.estimatedTotalPriceUsd * CFG.fx : 0;
+  CFG.totalUah = CFG.uah + CFG.uzeUah;
+  CFG.payback = CFG.save > 0 ? CFG.totalUah / CFG.save : null;
+}
+function requestPrice() {
+  clearTimeout(priceTimer);
+  if (S.type === "bess" || !(CFG.kwp > 0)) { PR = null; PRICE_PENDING = false; applyEconomics(); render(); return; }
+  PRICE_PENDING = true;
+  priceTimer = setTimeout(async () => {
+    const seq = ++priceSeq;
+    const { data, error } = await sb.rpc("calculate_quote", { p: quoteParams(), do_log: false });
+    if (seq !== priceSeq) return;                    // прийшла застаріла відповідь
+    PRICE_PENDING = false;
+    if (error) { PR = null; R.warnings.unshift("Не вдалося отримати ціну з сервера: " + error.message); applyEconomics(); render(); return; }
+    applyQuote(data); applyEconomics(); render();
+  }, 250);
+}
+
+function run() {
+  const kwp = toKwp($("fDc").value, $("fUnit").value);
+  const targetAc = Number($("fAc").value) || 0;
+  let unit, qty, model;
+  if (!manualInv) {
+    const a = pickForAc(targetAc || kwp / 1.15);
+    unit = a.inv.ac; qty = a.qty; model = a.inv.model;
+    fillModels(model); $("fInvKw").value = unit; $("fInvQty").value = qty;
+  } else {
+    unit = Number($("fInvKw").value) || 0; qty = Number($("fInvQty").value) || 0;
+    model = $("fInvModel").value; $("fAc").value = +(unit * qty).toFixed(1);
+  }
+  const actualAc = unit * qty;
+  $("acHint").textContent = actualAc
+    ? `Фактично ${nf(actualAc, actualAc % 1 ? 1 : 0)} кВт AC · ${qty} × ${nf(unit, unit % 1 ? 1 : 0)} кВт · DC/AC ${nf(kwp / actualAc, 2)}`
+    : "";
+
+  if (!manualPanel) fillPanels(autoPanel(kwp).w);
+  const modW = Number($("fPanel").value) || 615;
+  const panObj = D.panels.find(p => p.w === modW) || D.panels[1];
+  $("panHint").textContent = manualPanel ? "обрано вручну" : `підібрано автоматично — ${panObj.note}`;
+  let nMod = Math.ceil(kwp * 1000 / modW); if (nMod % 2) nMod++;
+
+  /* Ємність АКБ задає менеджер. sizeHybridBattery() використовується лише як
+     довідка: скільки треба для повного резерву і що вийде за поточної ємності. */
+  let BAT = null;
+  if (S.type === "hybrid" && actualAc > 0) {
+    const kwh = Number($("fBatKwh").value) || 0;
+    const backupTarget = Number($("fBackup").value) || actualAc;
+    const rec = sizeHybridBattery(actualAc, backupTarget);
+    const mods = kwh > 0 ? Math.max(1, Math.round(kwh / 5.12)) : 0;
+    const perCl = mods ? Math.ceil(mods / rec.clusters) : 0;
+    const vCluster = +(perCl * 51.2).toFixed(1);
+    BAT = {
+      kwh, totalKwh: +(mods * 5.12).toFixed(2), totalModules: mods,
+      clusters: rec.clusters, modulesPerCluster: perCl, clusterVoltage: vCluster,
+      usableKwh: +(mods * 5.12 * 0.9).toFixed(2),
+      backupPowerKw: +(vCluster * rec.clusters * rec.aPerInput / 1000).toFixed(1),
+      targetBackupKw: rec.targetBackupKw, controlBox: rec.controlBox,
+      controlBoxQty: rec.clusters, series: rec.series, aPerInput: rec.aPerInput,
+      currentSource: rec.currentSource, recommendedKwh: rec.totalKwh, errors: []
+    };
+    BAT.autonomyHoursAtBackup = BAT.targetBackupKw > 0
+      ? +(BAT.usableKwh / BAT.targetBackupKw).toFixed(1) : null;
+    $("batHint").innerHTML = kwh
+      ? `${BAT.totalModules} модулів · стек ${nf(vCluster, 0)} В · резерв ${nf(BAT.backupPowerKw, 1)} кВт · ` +
+        `для повного резерву ${nf(BAT.recommendedKwh, 1)} кВт·год`
+      : "Вкажіть ємність";
+  }
+
+  /* ---- УЗЕ (ціни відкриті, рахується в браузері) ---- */
+  let UZ = null;
+  if (uzeActive()) {
+    const u = curUze();
+    const targetKwh = Number($("fUzeKwh").value) || 0;
+    const qty = u && u.kwh && targetKwh > 0 ? Math.ceil(targetKwh / u.kwh) : 0;
+    const k = Number($("fUzeK").value) || 1;
+    const fxEur = Number($("fFxEur").value) || 48.5;
+    const totalEur = +(qty * u.withVatEur * k).toFixed(2);
+    UZ = { ...u, qty, k, fxEur,
+           totalKwh: +(qty * u.kwh).toFixed(2), totalKw: qty * u.kw,
+           totalEur, totalUah: Math.round(totalEur * fxEur) };
+    $("uzeHint").textContent = qty
+      ? `${qty} шт = ${nf(UZ.totalKwh, 1)} кВт·год / ${nf(UZ.totalKw)} кВт · ` +
+        `${nf(UZ.totalEur)} € · ${nf(UZ.totalUah)} грн`
+      : "Вкажіть цільову ємність";
+  }
+
+  R = calculateGeneration({
+    installedDcKwp: kwp, inverterUnitAcKw: unit, inverterQuantity: qty, inverterModel: model,
+    inverterEfficiency: Number($("fEff").value), gridExportLimitKw: $("fExport").value || null,
+    monthlySpecificYield: D.profileTypical,
+    profileMode: $("fMode").value, profileIsAcSide: true,
+    latitude: 49.23, tilt: Number($("fTilt").value), azimuth: Number($("fAz").value),
+    locationId: "ua-center" });
+  const fx = Number($("fFx").value) || 44.8, tariff = Number($("fTariff").value) || 0;
+  const uzeUah = UZ ? UZ.totalUah : 0;
+  const save = R.annualGenerationKwh * tariff;
+  CFG = { kwp, actualAc, nMod, modW, panObj, BAT, UZ, fx, tariff, uah: 0, uzeUah,
+          totalUah: uzeUah, save,
+          years: Number($("fYears").value) || 10, payback: null,
+          typeLabel: S.type === "hybrid" ? "Гібридна" : "Мережева",
+          placeLabel: S.place === "roof" ? "Дах" : "Земля" };
+  /* Поки чекаємо сервер — показуємо попередню ціну (якщо була), щоб екран не стрибав */
+  applyEconomics(); render();
+  requestPrice();
+}
+
+function render() {
+  const pw = nf(CFG.kwp, CFG.kwp % 1 ? 1 : 0);
+  const pend = PRICE_PENDING;
+  $("heroPrice").classList.toggle("pending", pend);
+  if (S.type === "bess") {
+    $("heroPrice").textContent = CFG.UZ && CFG.UZ.qty ? nf(CFG.UZ.totalEur) + " €" : "—";
+    $("heroSub").textContent = CFG.UZ && CFG.UZ.qty
+      ? `${nf(CFG.uzeUah)} грн · ${CFG.UZ.brand} ${CFG.UZ.model} · ${CFG.UZ.qty} шт · ` +
+        `${nf(CFG.UZ.totalKw)} кВт / ${nf(CFG.UZ.totalKwh, 1)} кВт·год`
+      : "Оберіть модель і вкажіть ємність";
+  } else {
+    $("heroPrice").textContent = PR ? nf(PR.estimatedTotalPriceUsd) + " $" +
+      (CFG.UZ && CFG.UZ.qty ? "  +  " + nf(CFG.UZ.totalEur) + " €" : "") : (pend ? "…" : "—");
+    $("heroSub").textContent = PR
+      ? `${nf(CFG.totalUah)} грн разом · ${CFG.typeLabel.toLowerCase()} СЕС ${pw} кВт · ` +
+        `інвертори ${nf(CFG.actualAc, CFG.actualAc % 1 ? 1 : 0)} кВт · ${CFG.placeLabel.toLowerCase()}` +
+        (CFG.UZ && CFG.UZ.qty ? ` · УЗЕ ${nf(CFG.UZ.totalKwh, 0)} кВт·год` : "")
+      : (pend ? "Отримую ціну з сервера…" : "Вкажіть потужність");
+  }
+  if (S.type === "bess") {
+    const U = CFG.UZ || {};
+    $("kpis").innerHTML = [
+      [nf(U.totalKw || 0), "Потужність PCS, кВт", "o"],
+      [nf(U.totalKwh || 0, 1), "Ємність, кВт·год", ""],
+      [nf(U.qty || 0), "Шаф, шт", ""],
+      [nf(CFG.uzeUah), "Вартість, грн", "o"]
+    ].map(k => `<div class="kpi"><div class="v ${k[2]}">${k[0]}</div><div class="l">${k[1]}</div></div>`).join("");
+  } else
+  $("kpis").innerHTML = [
+    [nf(R.annualGenerationKwh), "Річна генерація, кВт·год", "o"],
+    [nf(R.annualSpecificGenerationKwhKwp), "Питома генерація, кВт·год/кВт", ""],
+    [nf(CFG.save), "Річна економія, грн", ""],
+    [CFG.payback ? nf(CFG.payback, 1) + " р." : "—", "Простий термін окупності", "o"]
+  ].map(k => `<div class="kpi"><div class="v ${k[2]}">${k[0]}</div><div class="l">${k[1]}</div></div>`).join("");
+  const W = R.warnings.slice();
+  if (CFG.UZ) {
+    if (!CFG.UZ.qty) W.unshift("Вкажіть цільову ємність УЗЕ, щоб порахувати вартість.");
+    if (CFG.UZ.vatIn === "Ні")
+      W.push("Ціна " + CFG.UZ.brand + " надана на умовах " + CFG.UZ.incoterm +
+        " без ПДВ. У розрахунку ПДВ додано, але логістика в Україну та митні платежі НЕ включені — " +
+        "фактична вартість на об'єкті буде вищою.");
+    if (CFG.UZ.incoterm === "уточнити")
+      W.push("Умови постачання для " + CFG.UZ.brand + " не підтверджені. " +
+        "Незрозуміло, чи входить логістика в ціну.");
+    if (CFG.UZ.k === 1)
+      W.push("Коефіцієнт до ціни постачальника = 1,00. Це закупівельна вартість без націнки, " +
+        "монтажу та пусконалагодження. Для клієнтського КП коефіцієнт має задати комерційна функція.");
+  }
+  if (CFG.BAT) {
+    if (CFG.BAT.totalKwh > 0 && CFG.BAT.backupPowerKw < CFG.BAT.targetBackupKw * 0.98)
+      W.unshift("Батарея віддасть при зникненні мережі лише " + nf(CFG.BAT.backupPowerKw, 1) +
+        " кВт замість потрібних " + nf(CFG.BAT.targetBackupKw, 0) + " кВт. Причина: стек " +
+        nf(CFG.BAT.clusterVoltage, 0) + " В × " + CFG.BAT.clusters + " × " + CFG.BAT.aPerInput +
+        " A. Потужність батареї визначається напругою стека і струмом входу інвертора, а не ємністю.");
+    if (CFG.BAT.currentSource.indexOf("звірки") >= 0)
+      W.push("Струм АКБ для серії " + CFG.BAT.series + " ще не звірено з datasheet — " +
+        "цифра резервної потужності орієнтовна.");
+  }
+  const shown = S.type === "bess" ? W.filter(w => /УЗЕ|шафи|постачальник|коефіцієнт|ємність УЗЕ/i.test(w)) : W;
+  $("warnBox").innerHTML = shown.length
+    ? shown.map(w => `<div class="alert warn">${w}</div>`).join("")
+    : `<div class="alert ok">Конфігурація несуперечлива.</div>`;
+  $("accBadge").className = "acc " + R.calculationAccuracy;
+  $("accBadge").textContent = S.type === "bess" ? "" : R.calculationAccuracyText;
+  $("calcDisc").textContent = S.type === "bess" ? "" : R.calculationDisclaimer;
+
+  const clip = R.annualClippingLossKwh;
+  const cfg = [["Тип станції", CFG.typeLabel], ["Місце встановлення", CFG.placeLabel],
+    ["Потужність по полю", pw + " кВт"],
+    ["Кількість модулів (" + nf(CFG.modW) + " Вт)", nf(CFG.nMod) + " шт"],
+    ["Інвертор", R.inverterModel || "—"],
+    ["Кількість інверторів", nf(R.inverterQuantity) + " шт × " + nf(R.inverterUnitAcKw, R.inverterUnitAcKw % 1 ? 1 : 0) + " кВт"],
+    ["Потужність по інвертору", nf(R.inverterTotalAcKw, R.inverterTotalAcKw % 1 ? 1 : 0) + " кВт AC"],
+    ["DC/AC ratio", nf(R.dcAcRatio, 2)]];
+  if (CFG.BAT) cfg.push(
+    ["АКБ — конфігурація", CFG.BAT.clusters + " кластер(и) × " + CFG.BAT.modulesPerCluster + " модулів"],
+    ["АКБ — напруга стека", nf(CFG.BAT.clusterVoltage, 0) + " В"],
+    ["АКБ — ємність", nf(CFG.BAT.totalKwh, 2) + " кВт·год (корисних " + nf(CFG.BAT.usableKwh, 2) + ")"],
+    ["АКБ — резервна потужність", nf(CFG.BAT.backupPowerKw, 1) + " кВт"],
+    ["АКБ — автономія на резерві", CFG.BAT.autonomyHoursAtBackup + " год"],
+    ["Control box", CFG.BAT.controlBox + " — " + CFG.BAT.controlBoxQty + " шт"]);
+  cfg.push(["Втрати на кліпінгу", clip == null ? "не розраховано" : nf(clip) + " кВт·год/рік (орієнтовно)"],
+    ["Точність розрахунку", R.calculationAccuracyText]);
+  if (CFG.UZ && CFG.UZ.qty) cfg.push(
+    ["УЗЕ — модель", CFG.UZ.brand + " " + CFG.UZ.model],
+    ["УЗЕ — тип рішення", CFG.UZ.kind],
+    ["УЗЕ — кількість", nf(CFG.UZ.qty) + " шт"],
+    ["УЗЕ — потужність / ємність", nf(CFG.UZ.totalKw) + " кВт / " + nf(CFG.UZ.totalKwh, 1) + " кВт·год"],
+    ["УЗЕ — охолодження", CFG.UZ.cooling],
+    ["УЗЕ — гарантія", CFG.UZ.warranty || "уточнити"]);
+  if (S.type === "bess") cfg.splice(0, cfg.length - 6);
+  $("cfgTbl").innerHTML = cfg.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+
+  const eco = [];
+  if (PR) {
+    /* Ставки й розбивку бачить тільки адмін — сервер їх менеджеру не повертає */
+    if (IS_ADMIN && PR.pvPriceUsd != null) {
+      eco.push(["PV-частина", nf(PR.pvPriceUsd) + " $  (" + nf(PR.pricePerKwpUsd) + " $/кВт)"]);
+      if (PR.batteryPriceUsd) eco.push(
+        ["Накопичення", nf(PR.batteryPriceUsd) + " $  (" + nf(PR.pricePerKwhUsd) + " $/кВт·год)"]);
+    }
+    eco.push(["Вартість СЕС", nf(PR.estimatedTotalPriceUsd) + " $"],
+             ["у гривні", nf(CFG.uah) + " грн"], ["Курс", nf(CFG.fx, 2) + " грн/$"]);
+  } else if (S.type !== "bess") eco.push(["Вартість СЕС", pend ? "…" : "—"]);
+  if (CFG.UZ && CFG.UZ.qty) eco.push(
+    ["Вартість УЗЕ", nf(CFG.UZ.totalEur) + " €"],
+    ["у гривні", nf(CFG.uzeUah) + " грн"], ["Курс", nf(CFG.UZ.fxEur, 2) + " грн/€"],
+    ["Коефіцієнт до ціни постачальника", nf(CFG.UZ.k, 2)]);
+  if (PR && CFG.UZ && CFG.UZ.qty) eco.push(["РАЗОМ, грн", nf(CFG.totalUah)]);
+  if (S.type !== "bess") eco.push(["Тариф", nf(CFG.tariff, 2) + " грн/кВт·год"],
+    ["Річна економія", nf(CFG.save) + " грн"],
+    ["Простий термін окупності", CFG.payback ? nf(CFG.payback, 1) + " років" : "—"]);
+  $("ecoTbl").innerHTML = eco.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  $("priceDisc").textContent = PR ? PR.disclaimer : "";
+
+  if (S.type !== "bess") {
+    drawChart("chart", R.monthlyGeneration, 940, 300);
+    drawPayback("payChart", CFG.totalUah, CFG.save, CFG.years, 940, 330);
+  }
+  buildOffer();
+}
+
+/* -------------------------------------------------------------- графіки */
+function niceMax(v) {
+  if (v <= 0) return 10;
+  const p = Math.pow(10, Math.floor(Math.log10(Math.abs(v))));
+  for (const s of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (v <= s * p) return s * p;
+  return 10 * p;
+}
+function drawChart(el, data, W, H) {
+  const L = 78, B = 46, T = 12, Rr = 12;
+  const max = niceMax(Math.max(...data.map(d => d.generationKwh), 1));
+  const pw = (W - L - Rr) / 12, ph = H - T - B;
+  let g = "";
+  for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4;
+    g += `<line x1="${L}" y1="${y}" x2="${W - Rr}" y2="${y}" stroke="#E3E0DC"/>`;
+    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#7A736D" font-size="11">${nf(max * (1 - i / 4))}</text>`; }
+  data.forEach((d, i) => {
+    const bh = ph * d.generationKwh / max, x = L + i * pw + pw * .16, w = pw * .68, y = T + ph - bh;
+    g += `<path d="M${x},${T + ph} L${x},${y + 3} Q${x},${y} ${x + 3},${y} L${x + w - 3},${y} Q${x + w},${y} ${x + w},${y + 3} L${x + w},${T + ph} Z" fill="#FE5000" class="bar" data-m="${d.monthLabel}" data-v="${Math.round(d.generationKwh)}"/>`;
+    g += `<text x="${L + i * pw + pw / 2}" y="${T + ph + 16}" text-anchor="middle" fill="#7A736D" font-size="11">${d.monthLabel.slice(0, 3)}</text>`; });
+  $(el).innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:620px;height:auto;font-family:Arial">${g}</svg>
+    <div class="cap">Орієнтовний розрахунок. Не є результатом моделювання у PVsyst.</div>`;
+  hookTips(el, "кВт·год");
+}
+function drawPayback(el, investUah, saveUah, years, W, H) {
+  const L = 92, B = 56, T = 26, Rr = 12;
+  const base = new Date().getFullYear() + 1;
+  const pts = [{ l: "Інвестиція", v: -investUah }];
+  let c = -investUah;
+  for (let i = 0; i < years; i++) { c += saveUah; pts.push({ l: String(base + i), v: c }); }
+  const hi = Math.max(...pts.map(p => p.v), 0), lo = Math.min(...pts.map(p => p.v), 0);
+  const top = niceMax(hi || 1), bot = -niceMax(Math.abs(lo) || 1);
+  const span = top - bot || 1, pw = (W - L - Rr) / pts.length, ph = H - T - B;
+  const y0 = T + ph * (top / span);
+  let g = "";
+  for (let i = 0; i <= 4; i++) { const y = T + ph * i / 4, v = top - span * i / 4;
+    g += `<line x1="${L}" y1="${y}" x2="${W - Rr}" y2="${y}" stroke="#EFEDEA"/>`;
+    g += `<text x="${L - 8}" y="${y + 4}" text-anchor="end" fill="#7A736D" font-size="11">${nf(v)}</text>`; }
+  g += `<line x1="${L}" y1="${y0}" x2="${W - Rr}" y2="${y0}" stroke="#9A938D"/>`;
+  const short = v => Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1).replace(".", ",") + " млн"
+                   : Math.round(v / 1000) + " тис.";
+  pts.forEach((p, i) => {
+    const y = T + ph * ((top - p.v) / span), x = L + i * pw + pw * .18, w = pw * .64;
+    const cx = L + i * pw + pw / 2;
+    g += `<rect x="${x}" y="${Math.min(y, y0)}" width="${w}" height="${Math.abs(y - y0)}" rx="2" fill="${p.v < 0 ? "#C0392B" : "#5A8C3A"}" class="bar" data-m="${p.l}" data-v="${Math.round(p.v)}"/>`;
+    const ly = p.v < 0 ? y + 13 : y - 6;
+    g += `<text x="${cx}" y="${ly}" text-anchor="middle" font-size="10.5" font-weight="bold" fill="${p.v < 0 ? "#C0392B" : "#3F6B28"}">${short(p.v)}</text>`;
+    g += `<text transform="translate(${cx},${T + ph + 14}) rotate(-40)" text-anchor="end" fill="#7A736D" font-size="10">${p.l}</text>`; });
+  $(el).innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:620px;height:auto;font-family:Arial">${g}</svg>`;
+  hookTips(el, "грн");
+}
+function hookTips(el, unit) {
+  $(el).querySelectorAll(".bar").forEach(b => {
+    b.addEventListener("mousemove", e => { const t = $("tip"); t.style.opacity = 1;
+      t.textContent = b.dataset.m + ": " + nf(+b.dataset.v) + " " + unit;
+      t.style.left = (e.clientX + 14) + "px"; t.style.top = (e.clientY - 30) + "px"; });
+    b.addEventListener("mouseleave", () => $("tip").style.opacity = 0); });
+}
+
+/* --------------------------------------------------------- пропозиція */
+const PRICE_DISC = PRICE_DISCLAIMER;
+const CO = { name: "Група компаній «Промавтоматика»",
+  addr: "м. Вінниця, 21021, вул. Хмельницьке шосе, 145",
+  phones: "+38 (0432) 56-12-20 · +38 (067) 433 43 33",
+  hours: "Пн–Пт 8:00–19:00 · Сб 9:00–14:00", site: "pa.ua",
+  cities: "Вінниця · Київ · Львів · Хмельницький · Дніпро" };
+const PROJECTS = [
+  ["Перлина Поділля", "400 кВт"],
+  ["Баришівська Зернова", "379 кВт · мережева + гібридна"],
+  ["ЖК Кемпінг Сіті", "345 кВт"],
+  ["Арден палац", "350 кВт"],
+  ["Жовкічанка ПП", "300 / 160 / 150 кВт"],
+  ["Маяк ПрАТ", "240 кВт"],
+  ["Об'єкт 7", "потужність"],
+  ["Об'єкт 8", "потужність"],
+  ["Об'єкт 9", "потужність"]
+];
+const today = () => { const d = new Date();
+  return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + d.getFullYear(); };
+
+function buildOffer() {
+  if (!ME || !CFG) return;
+  const m = { name: ME.full_name, role: ME.position || "", branch: ME.filial,
+              phone: ME.phone || "", mail: ME.email || "", client: $("mClient").value,
+              city: $("mCity").value, doc: $("mDoc").value, valid: $("mValid").value,
+              video: $("mVideo").value };
+  const st = { years: $("sYears").value, branch: $("sBranch").value,
+               obj: $("sObj").value, mw: $("sMw").value };
+  const pw = nf(CFG.kwp, CFG.kwp % 1 ? 1 : 0);
+  const acw = nf(CFG.actualAc, CFG.actualAc % 1 ? 1 : 0);
+  const foot = `<div class="foot">${CO.name} · ${CO.site}</div>`;
+  let n = 0; const pnum = () => `<div class="pnum">${++n}</div>`;
+  const hyb = S.type === "hybrid";
+  const bessOnly = S.type === "bess";
+  const U = CFG.UZ && CFG.UZ.qty ? CFG.UZ : null;
+
+  const spec = [
+    ["Тип станції", CFG.typeLabel],
+    ["Розміщення", CFG.placeLabel],
+    ["Потужність по полю", `${pw} кВт`],
+    [`Фотомодулі ${CFG.panObj.model}`, `${nf(CFG.nMod)} шт`],
+    [`Інвертор ${D.invBrands.join(" · ")} потужністю ${nf(R.inverterUnitAcKw, R.inverterUnitAcKw % 1 ? 1 : 0)} кВт`,
+     `${nf(R.inverterQuantity)} шт`]
+  ];
+  if (hyb && CFG.BAT && CFG.BAT.totalKwh > 0) spec.push(
+    [`Акумуляторні батареї ${D.batBrands.join(" · ")}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
+  const included = [
+    ["Монтажна конструкція для фотомодулів", "повний комплект"],
+    ["Кабельні лінії DC", "повний комплект"],
+    ["Щити захисту DC/AC та ПЗІП", "повний комплект"],
+    ["Система моніторингу", "повний комплект"],
+    ["Монтажні роботи", "повний обсяг"],
+    ["Пусконалагоджувальні роботи", "повний обсяг"]
+  ];
+  const excluded = [
+    ["Приєднання до мережі", "окремою опцією"],
+    ["Проєктна документація", "окремою опцією"],
+    ["Силова частина", "після візиту на об'єкт"]
+  ];
+  const trow = r => `<tr class="sp"><td>${r[0]}</td><td>${r[1]}</td></tr>`;
+  const band = t => `<tr class="band"><td colspan="2">${t}</td></tr>`;
+  const half = (a, b) => `<table><thead><tr><th>Місяць</th><th class="num">кВт·год</th><th class="num">грн</th></tr></thead><tbody>` +
+    R.monthlyGeneration.slice(a, b).map(x =>
+      `<tr><td>${x.monthLabel}</td><td class="num">${nf(x.generationKwh)}</td><td class="num">${nf(x.generationKwh * CFG.tariff)}</td></tr>`).join("") +
+    `</tbody></table>`;
+
+  $("offer").innerHTML = `
+<div class="pg cov">
+ <div class="lgrow"><span class="lg1">Група компаній</span><span class="lg2">ПРОМАВТОМАТИКА</span></div>
+ <div class="bighead">ВІДНОВЛЮВАНА<br>ЕНЕРГЕТИКА</div>
+ <div class="covsub">Сонячні електростанції та системи накопичення енергії</div>
+ <div class="photoband" style="${PHOTO ? `background-image:url('${PHOTO}')` : ""}"></div>
+ <div class="covbot">
+  <div style="flex:1">
+   <div class="kicker">Індикативна пропозиція</div>
+   <div class="cname">${m.client || "—"}</div>
+   <div class="cline">${CFG.typeLabel} СЕС ${pw} кВт · інвертори ${acw} кВт · ${CFG.placeLabel.toLowerCase()}${
+     hyb && CFG.BAT && CFG.BAT.totalKwh ? ` · АКБ ${nf(CFG.BAT.totalKwh, 1)} кВт·год` : ""}<br>${m.city}</div>
+  </div>
+ </div>
+ <div class="peach">
+  <div class="pbig">Індикативна<br>пропозиція</div>
+  <div class="pmeta">КП № ${m.doc} від ${today()}<br>
+   Розрахунок орієнтовний, актуальний протягом ${m.valid} календарних днів</div>
+ </div>
+</div>
+
+<div class="pg" style="display:flex;flex-direction:column">
+ <h2>Дякуємо за вашу довіру</h2><div class="rule"></div>
+ <p class="lead">Дякуємо, що розглядаєте «Промавтоматику» як партнера у будівництві сонячної
+  електростанції. Для нас це не рядовий запит, а відповідальність, яку ми беремо серйозно.</p>
+ <h3>Що ви отримуєте в цій пропозиції</h3>
+ <p>На наступних сторінках — склад станції, орієнтовна вартість і розрахунок генерації за місяцями
+  з графіком повернення інвестицій. Усі цифри попередні: вони дають масштаб рішення, але не замінюють
+  проєктного розрахунку після виїзду на об'єкт.</p>
+
+ <h3 style="margin-top:14px">Серед наших клієнтів у напрямку ВДЕ</h3>
+ <div class="clients">${Array.from({length:12}).map(() => `<div class="clogo">логотип клієнта</div>`).join("")}</div>
+ <div style="flex:1"></div>
+ <div class="stats" style="margin-bottom:6mm">
+  <div class="stat"><div class="n">${st.years}</div><div class="c">років на ринку</div></div>
+  <div class="stat"><div class="n">${st.branch}</div><div class="c">філій</div></div>
+  <div class="stat"><div class="n">${st.obj}</div><div class="c">реалізованих<br>промислових об'єктів</div></div>
+  <div class="stat"><div class="n">${st.mw} МВт</div><div class="c">у портфелі</div></div>
+ </div>
+ ${foot}${pnum()}
+</div>
+
+${bessOnly ? "" : `<div class="pg">
+ <h2>Склад станції та вартість</h2><div class="rule"></div>
+ <table><tbody>
+  ${band("Конфігурація станції")}
+  ${spec.map(trow).join("")}
+  ${band("Додатково у вартість включено")}
+  ${included.map(trow).join("")}
+ </tbody></table>
+
+ <div style="height:12px"></div>
+ <div class="obox">
+  <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.92">Орієнтовна вартість станції</div>
+  <div class="big">${nf(PR ? PR.estimatedTotalPriceUsd : 0)} $</div>
+ </div>
+
+ <div style="height:10px"></div>
+ <table><tbody>
+  ${band("У вартість станції не входить")}
+  ${excluded.map(trow).join("")}
+ </tbody></table>
+ <p class="note-big">${PRICE_DISCLAIMER}</p>
+ ${foot}${pnum()}
+</div>`}
+
+${!U ? "" : `<div class="pg">
+ <h2>Система накопичення енергії</h2><div class="rule"></div>
+ <p class="lead">${bessOnly
+   ? "Промислова система накопичення енергії дозволяє зберігати електроенергію та віддавати її тоді, коли це потрібно об'єкту — під час пікових тарифів або відсутності напруги в мережі."
+   : "Додатково до сонячної електростанції пропонуємо систему накопичення енергії. Вона працює паралельно зі станцією на шині об'єкта і не залежить від наявності сонця."}</p>
+ <table><tbody>
+  ${band("Конфігурація системи накопичення")}
+  ${[["Виробник", U.brand],
+     ["Модель", U.model],
+     ["Тип рішення", U.kind],
+     ["Кількість блоків", `${nf(U.qty)} шт`],
+     ["Потужність перетворювача", `${nf(U.totalKw)} кВт`],
+     ["Ємність накопичення", `${nf(U.totalKwh, 1)} кВт·год`],
+     ["Охолодження", U.cooling],
+     ["Гарантія", U.warranty || "уточнюється"]].map(trow).join("")}
+  ${band("Що входить у поставку")}
+  <tr class="sp"><td colspan="2" style="text-align:left;font-weight:normal;color:#2D2926">${U.included || "уточнюється"}</td></tr>
+ </tbody></table>
+ <div style="height:12px"></div>
+ <div class="obox">
+  <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.92">Орієнтовна вартість системи накопичення</div>
+  <div class="big">${nf(U.totalEur)} €</div>
+ </div>
+ <p class="fine" style="margin-top:8px">${PRICE_DISCLAIMER}</p>
+ <p class="fine">Вартість наведена в євро за курсом ${nf(U.fxEur, 2)} грн/€ на дату пропозиції.
+  Монтаж, пусконалагодження та інтеграція з мережею об'єкта уточнюються після обстеження.</p>
+ ${foot}${pnum()}
+</div>`}
+
+${bessOnly ? "" : `<div class="pg">
+ <h2>Орієнтовна генерація та повернення інвестицій</h2><div class="rule"></div>
+ <div id="offerChart"></div>
+ <div style="height:8px"></div>
+ <div class="mtbl">${half(0, 6)}${half(6, 12)}</div>
+ <table><tfoot><tr><td>Загалом за рік</td><td class="num">${nf(R.annualGenerationKwh)} кВт·год</td><td class="num">${nf(CFG.save)} грн</td></tr></tfoot></table>
+ <h3>Повернення інвестицій</h3>
+ <div id="offerPay"></div>
+ <div style="height:8px"></div>
+ <div class="box"><table class="spec" style="font-size:11.5px">
+  <tr><td>Тариф, прийнятий у розрахунку</td><td>${nf(CFG.tariff, 2)} грн/кВт·год</td></tr>
+  <tr><td>Річна економія</td><td>${nf(CFG.save)} грн</td></tr>
+  <tr><td>Економія за 5 років</td><td>${nf(CFG.save * 5)} грн</td></tr>
+  <tr><td>Економія за 10 років</td><td>${nf(CFG.save * 10)} грн</td></tr>
+  <tr><td>Простий термін окупності</td><td>${CFG.payback ? nf(CFG.payback, 1) + " років" : "—"}</td></tr>
+ </table></div>
+ <p class="fine" style="margin-top:8px">${R.calculationDisclaimer}</p>
+ ${foot}${pnum()}
+</div>`}
+
+<div class="pg combo">
+ <div class="topsec">
+  <h2>Реалізовані проєкти</h2><div class="rule"></div>
+  <p class="lead" style="margin-bottom:0">Промислові сонячні електростанції, побудовані групою компаній «Промавтоматика».</p>
+  <div class="projects">${PROJECTS.map(p =>
+    `<div class="pcard"><div class="pph">[ фото ]</div><div class="t">${p[0]}</div><div class="p">${p[1]}</div></div>`).join("")}</div>
+ </div>
+ <div class="botsec">
+  <h2>Наступний крок</h2>
+  <ul class="steps">
+   <li><span class="n">01</span><span class="t">Технічний візит на об'єкт<br><span style="font-size:10px;opacity:.85;font-weight:normal">після попереднього погодження концепції рішення, орієнтовного бюджету та строків реалізації</span></span><span class="w">4–7 робочих днів</span></li>
+   <li><span class="n">02</span><span class="t">Фінальний розрахунок і кошторис</span><span class="w">5–7 робочих днів</span></li>
+   <li><span class="n">03</span><span class="t">Договір і початок робіт</span><span class="w">за графіком проєкту</span></li>
+  </ul>
+  <p style="font-size:10.5px;line-height:1.5;opacity:.85;margin:8px 0 0">Строки орієнтовні й уточнюються після візиту на об'єкт.${m.video ? ` Відгуки наших клієнтів: <b>${m.video}</b>` : ""}</p>
+  <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin:7mm 0 5px">Ваш менеджер напрямку ВДЕ</div>
+  <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+   <div style="flex:1;min-width:180px">
+    <div style="font-size:22px;font-weight:bold;line-height:1.15">${m.name}</div>
+    <div style="font-size:12px;opacity:.94">${m.role} · ${m.branch}</div>
+    <div style="font-size:13px;margin-top:6px;line-height:1.6;font-weight:bold">${m.phone}<br>${m.mail}</div></div>
+   <div class="mgr" style="min-width:240px;padding:11px 14px;font-size:11px;line-height:1.55">
+    <div style="font-weight:bold;margin-bottom:2px">${CO.name}</div>
+    <div>${CO.addr}</div><div>${CO.phones}</div><div>${CO.hours}</div>
+    <div style="color:#FE5000;font-weight:bold">${CO.site}</div></div>
+  </div>
+  <div class="cities" style="margin-top:9mm">${CO.cities}</div>
+ </div>
+</div>`;
+  if (!bessOnly) {
+    drawChart("offerChart", R.monthlyGeneration, 660, 180);
+    drawPayback("offerPay", CFG.totalUah, CFG.save, CFG.years, 660, 190);
+  }
+}
+
+
+/* ------------------------------------------------------- друк + лог КП */
+async function printOffer() {
+  if (PRICE_PENDING) { await new Promise(r => setTimeout(r, 600)); }
+  if (S.type !== "bess" && CFG.kwp > 0 && !PR) { alert("Ціна ще не отримана з сервера. Спробуйте ще раз."); return; }
+  const { data, error } = await sb.rpc("calculate_quote", { p: quoteParams(), do_log: true });
+  if (error) { alert("Не вдалося зафіксувати КП: " + error.message); return; }
+  if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); render(); }
+  loadHistory();
+  setTimeout(() => window.print(), 50);
+}
+const TYPE_LABEL = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
+async function loadHistory() {
+  const { data, error } = await sb.from("kp_log").select("*").eq("manager_id", ME.id)
+    .order("created_at", { ascending: false }).limit(15);
+  const tb = $("histTbl").querySelector("tbody");
+  if (error) { tb.innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`; return; }
+  tb.innerHTML = data.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(r.client_name)}</td><td>${esc(r.kp_number)}</td>
+    <td>${TYPE_LABEL[r.system_type] || esc(r.system_type)}</td><td class="num">${nf(r.installed_dc_kwp, 1)}</td>
+    <td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td></tr>`).join("")
+    || "<tr><td colspan='7' class='muted'>Ще немає зафіксованих КП</td></tr>";
+}
+
+/* ------------------------------------------------------------- події */
+["fDc", "fUnit"].forEach(id => $(id).addEventListener("input", () => { manualInv = false; autoAc(); }));
+$("fAc").addEventListener("input", () => { manualInv = false; run(); });
+$("fPanel").addEventListener("change", () => { manualPanel = true; run(); });
+$("fUzeKind").addEventListener("change", () => { fillUze(); run(); });
+$("fUze").addEventListener("change", run);
+["fTariff", "fEff", "fExport", "fTilt", "fAz", "fFx", "fMode", "fBatKwh", "fBackup", "fYears", "fUzeKwh", "fUzeK", "fFxEur"]
+  .forEach(id => $(id).addEventListener("input", run));
+["fInvModel", "fInvKw", "fInvQty"].forEach(id => $(id).addEventListener("input", () => {
+  manualInv = true;
+  if (id === "fInvModel") { const x = pool().find(v => v.model === $("fInvModel").value); if (x) $("fInvKw").value = x.ac; }
+  run(); }));
+["mClient", "mCity", "mDoc", "mValid", "mVideo", "sYears", "sBranch", "sObj", "sMw"]
+  .forEach(id => $(id).addEventListener("input", buildOffer));
+$("fPhoto").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => { PHOTO = ev.target.result; PHOTO_FIT = "cover"; showThumb(); buildOffer(); };
+  r.readAsDataURL(f); });
+$("resetPhoto").addEventListener("click", e => {
+  e.preventDefault(); PHOTO = DEFAULT_PHOTO; PHOTO_FIT = "contain";
+  $("fPhoto").value = ""; showThumb(); buildOffer(); });
+function showThumb() {
+  const t = $("photoThumb");
+  if (PHOTO) { t.src = PHOTO; t.style.display = "block"; } else t.style.display = "none";
+}
+
+/* ------------------------------------------------------------- старт */
+(async () => {
+  const a = await requireAuth(); if (!a) return;
+  ME = a.profile; IS_ADMIN = ME.role === "admin";
+  $("mgrLine").textContent = `${ME.full_name} · ${ME.position || ""} · ${ME.filial} · ${ME.phone || ""} · ${ME.email || a.session.user.email}`;
+  seg("segType", "type"); seg("segPlace", "place"); seg("segUze", "addUze");
+  showThumb(); fillUze(); syncVisibility(); autoAc();
+  loadHistory();
+})();
+</script>
+</body></html>

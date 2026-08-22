@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промавтоматика · Користувачі</title>
+<link rel="stylesheet" href="css/app.css">
+</head><body>
+<div id="nav"></div>
+<div class="wrap">
+ <div class="top"><div><h1>Користувачі</h1>
+  <div class="sub">Контакти менеджера підставляються у КП автоматично. Редагувати їх може тільки адмін.</div></div>
+  <button class="btn" id="save">Зберегти зміни</button></div>
+ <div id="msg"></div>
+ <div class="card"><h2>Профілі</h2>
+  <table class="edit" id="tbl"><thead><tr><th>Пошта</th><th>ПІБ</th><th>Посада</th><th>Філія</th><th>Телефон</th><th>E-mail у КП</th><th>Роль</th></tr></thead><tbody></tbody></table>
+ </div>
+ <div class="card"><h2>Як додати нового менеджера</h2>
+  <ol style="font-size:13px;line-height:1.7;margin:0;padding-left:20px">
+   <li>Supabase → <b>Authentication → Users → Add user → Create new user</b>. Вкажіть пошту й пароль, увімкніть «Auto Confirm User».</li>
+   <li>Профіль створиться автоматично з роллю «Менеджер». Оновіть цю сторінку.</li>
+   <li>Заповніть ПІБ, посаду, філію, телефон і натисніть «Зберегти зміни».</li>
+  </ol>
+  <div class="hint" style="margin-top:8px">Кнопка «створити користувача» прямо на сайті потребує серверної функції з сервісним ключем — заплановано на наступну версію.</div>
+ </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+let ROWS = [], ME = null;
+const F = ["full_name", "position", "filial", "phone", "email"];
+function msg(t, bad) { document.getElementById("msg").innerHTML = t ? `<div class="alert ${bad ? "warn" : "ok"}">${esc(t)}</div>` : ""; }
+async function load() {
+  const r = await sb.from("profiles").select("*").order("created_at");
+  if (r.error) { msg(r.error.message, true); return; }
+  ROWS = r.data;
+  const { data: { user } } = await sb.auth.getUser();
+  document.querySelector("#tbl tbody").innerHTML = ROWS.map(p => `<tr data-id="${p.id}">
+    <td class="muted">${esc(p.email || "")}</td>
+    ${F.map(f => `<td><input data-f="${f}" value="${esc(p[f] || "")}"></td>`).join("")}
+    <td><select data-f="role" ${p.id === user.id ? "disabled" : ""}>
+      <option value="manager" ${p.role === "manager" ? "selected" : ""}>Менеджер</option>
+      <option value="admin" ${p.role === "admin" ? "selected" : ""}>Адмін</option></select></td></tr>`).join("");
+}
+async function save() {
+  const btn = document.getElementById("save"); btn.disabled = true; msg("");
+  const errs = []; let n = 0;
+  for (const tr of document.querySelectorAll("#tbl tbody tr")) {
+    const id = tr.dataset.id, orig = ROWS.find(p => p.id === id), upd = {};
+    tr.querySelectorAll("[data-f]").forEach(el => { if (!el.disabled && (orig[el.dataset.f] || "") !== el.value) upd[el.dataset.f] = el.value; });
+    if (!Object.keys(upd).length) continue;
+    if ("full_name" in upd && !upd.full_name.trim()) { errs.push("ПІБ не може бути порожнім"); continue; }
+    const { error } = await sb.from("profiles").update(upd).eq("id", id);
+    if (error) errs.push(error.message); else n++;
+  }
+  await load();
+  msg(errs.length ? errs.join("; ") : (n ? `Збережено (${n}).` : "Змін немає."), errs.length > 0);
+  btn.disabled = false;
+}
+(async () => {
+  const a = await requireAuth("admin"); if (!a) return; ME = a.profile;
+  document.getElementById("save").onclick = save;
+  await load();
+})();
+</script>
+</body></html>
