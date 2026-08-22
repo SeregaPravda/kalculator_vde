@@ -62,6 +62,27 @@ create table if not exists public.battery_prices (
   updated_by       uuid references public.profiles(id)
 );
 
+-- Ціни УЗЕ. Відкриті для всіх авторизованих (не таємниця), редагує адмін.
+create table if not exists public.uze_prices (
+  uze_id      text primary key,
+  brand       text not null,
+  model       text not null,
+  kind        text not null default 'Шафове (All-in-One)',
+  kw          numeric not null,
+  kwh         numeric not null,
+  cooling     text,
+  price_eur   numeric not null,             -- ціна постачальника як надана
+  vat_in      boolean not null default false, -- чи включає ПДВ
+  incoterm    text default 'уточнити',
+  included    text,
+  warranty    text,
+  source      text,                         -- звідки ціна (рахунок, дата)
+  sort        integer default 100,
+  active      boolean not null default true,
+  updated_at  timestamptz default now(),
+  updated_by  uuid references public.profiles(id)
+);
+
 -- ----------------------------------------------------------- ЛІЧИЛЬНИК КП
 create table if not exists public.kp_log (
   id               bigserial primary key,
@@ -80,6 +101,19 @@ create table if not exists public.kp_log (
   kp_number        text
 );
 create index if not exists kp_log_manager_idx on public.kp_log (manager_id, created_at desc);
+alter table public.kp_log add column if not exists params jsonb;
+
+-- Автономер КП: YYYY-NNNN, окремий лічильник на кожен рік
+create table if not exists public.kp_counter (year integer primary key, last integer not null default 0);
+create or replace function public.next_kp_number()
+returns text language plpgsql security definer set search_path = public as $$
+declare y integer := extract(year from now())::integer; n integer;
+begin
+  insert into public.kp_counter (year, last) values (y, 1)
+    on conflict (year) do update set last = public.kp_counter.last + 1
+    returning last into n;
+  return y::text || '-' || lpad(n::text, 4, '0');
+end $$;
 
 -- ------------------------------------------------------------- СТАРТОВІ ЦІНИ
 -- Значення 1:1 з calc_engine.js v2.0 (PRICE_PER_KWP_USD, BATTERY_PRICE_PER_KWH_USD)
@@ -96,11 +130,28 @@ insert into public.battery_prices (capacity_segment, rate_usd_per_kwh) values
   ('small',460), ('medium',430), ('large',400)
 on conflict (capacity_segment) do nothing;
 
+-- УЗЕ: KSTAR — рахунки KSTR-QTN-20262807 від 28.07.2026; Elecnova і Huawei — дані комерційної функції 22.08.2026
+insert into public.uze_prices (uze_id, brand, model, kw, kwh, cooling, price_eur, vat_in, incoterm, included, warranty, source, sort) values
+  ('UZE-KS-240','KSTAR','KAC125DP2 + BC240DE2A',125,241.15,'Рідинне',36735.5,false,'FCA Poland',
+   'Гібридний інвертор 125 кВт (Gen 2) · батарейна шафа 241,15 кВт·год · кабелі АКБ · вбудований EMS · трифазний лічильник',
+   '5 років на продукт / 10 років на продуктивність','KSTR-QTN-20262807 від 28.07.2026, дійсний 1 місяць',10),
+  ('UZE-KS-260','KSTAR','KAC125DP2 + BC260DE2A',125,261.24,'Рідинне',38774.5,false,'FCA Poland',
+   'Гібридний інвертор 125 кВт (Gen 2) · батарейна шафа 261,24 кВт·год · кабелі АКБ · вбудований EMS · трифазний лічильник',
+   '5 років на продукт / 10 років на продуктивність','KSTR-QTN-20262807-2 від 28.07.2026, дійсний 1 місяць',20),
+  ('UZE-EN-261','Elecnova','ECO-E261LP-2A · 125 кВт / 261 кВт·год',125,261,'Рідинне',30500,false,'уточнити',
+   'уточнити склад комплекту','уточнити','закупівельна ціна, 22.08.2026',30),
+  ('UZE-HW-241','Huawei','LUNA2000-241-2S1',108,241,'Гібридне (рідинне + повітряне)',58000,true,'уточнити',
+   'Батарейні модулі · вбудований PCS · RCM · система терморегулювання · TRSD (придушення теплового розгону) · DC-DC опційно',
+   'уточнити','рахунок від 07.05.2026',40)
+on conflict (uze_id) do nothing;
+
 -- --------------------------------------------------------------------- RLS
 alter table public.profiles       enable row level security;
 alter table public.pv_prices      enable row level security;
 alter table public.battery_prices enable row level security;
 alter table public.kp_log         enable row level security;
+alter table public.uze_prices     enable row level security;
+alter table public.kp_counter     enable row level security;
 
 -- profiles: менеджер читає тільки себе; адмін — читає і пише все
 drop policy if exists profiles_select on public.profiles;
@@ -118,6 +169,13 @@ drop policy if exists battery_prices_admin on public.battery_prices;
 create policy battery_prices_admin on public.battery_prices for all
   using (public.is_admin()) with check (public.is_admin());
 
+-- uze_prices: читають усі авторизовані, пише адмін
+drop policy if exists uze_prices_read on public.uze_prices;
+create policy uze_prices_read on public.uze_prices for select to authenticated using (true);
+drop policy if exists uze_prices_admin on public.uze_prices;
+create policy uze_prices_admin on public.uze_prices for all
+  using (public.is_admin()) with check (public.is_admin());
+
 -- kp_log: читання — свої рядки або адмін; вставка — тільки через RPC (політики insert немає)
 drop policy if exists kp_log_select on public.kp_log;
 create policy kp_log_select on public.kp_log for select
@@ -132,7 +190,8 @@ create policy kp_log_admin_delete on public.kp_log for delete
 --   system_type: 'network'|'hybrid'|'bess', placement: 'roof'|'ground',
 --   installed_dc_kwp, battery_kwh,
 --   uze_id, uze_qty, uze_total_eur   (УЗЕ рахується в браузері, тут лише для логу)
---   client_name, city, kp_number
+--   client_name, city, kp_number (порожній → згенерується автоматично при do_log),
+--   params: повний стан форми для повтору КП з історії
 -- }
 -- do_log = true → одночасно пише рядок у kp_log (викликається при друку КП)
 create or replace function public.calculate_quote(p jsonb, do_log boolean default false)
@@ -151,6 +210,7 @@ declare
   u_id       text := p->>'uze_id';
   u_qty      integer := coalesce((p->>'uze_qty')::integer, 0);
   u_total    numeric := (p->>'uze_total_eur')::numeric;
+  kp_no      text := nullif(trim(coalesce(p->>'kp_number', '')), '');
   res        jsonb;
 begin
   if uid is null then
@@ -188,12 +248,13 @@ begin
 
   -- ---- лог
   if do_log then
+    if kp_no is null then kp_no := public.next_kp_number(); end if;
     insert into public.kp_log (manager_id, system_type, placement, installed_dc_kwp, battery_kwh,
                                total_price_usd, uze_id, uze_qty, uze_total_eur,
-                               client_name, city, kp_number)
+                               client_name, city, kp_number, params)
     values (uid, coalesce(st, '?'), pl, nullif(kwp, 0), nullif(kwh, 0),
             total_usd, u_id, nullif(u_qty, 0), u_total,
-            p->>'client_name', p->>'city', p->>'kp_number');
+            p->>'client_name', p->>'city', kp_no, p->'params');
   end if;
 
   res := jsonb_build_object(
@@ -201,7 +262,8 @@ begin
     'pv_kwp', kwp, 'battery_kwh', kwh,
     'vat_included', true,
     'is_admin', adm,
-    'logged', do_log
+    'logged', do_log,
+    'kp_number', kp_no
   );
   -- Розбивку і ставки бачить тільки адмін
   if adm then

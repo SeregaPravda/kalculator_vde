@@ -14,6 +14,7 @@
   <button class="btn" style="padding:9px 14px;font-size:12px" id="apply">Показати</button>
   <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="month">Цей місяць</button>
   <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="all">Весь час</button>
+  <button class="btn" style="padding:9px 14px;font-size:12px;margin-left:auto" id="csv">Експорт в Excel (CSV)</button>
  </div>
  <div class="kpis" id="kpis"></div>
  <div style="height:16px"></div>
@@ -30,7 +31,25 @@
 <script src="js/auth.js"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
+const PLACE = { roof: "Дах", ground: "Земля" };
 const $ = i => document.getElementById(i);
+let LOG = [];
+
+/* CSV з BOM і «;» — Excel (укр./рос. локаль) відкриває одразу без майстра імпорту */
+function exportCsv() {
+  const { f, t } = range();
+  const head = ["Дата", "Менеджер", "Філія", "Клієнт", "Місто", "№ КП", "Тип", "Місце", "кВт", "АКБ, кВт·год", "СЕС, $", "УЗЕ", "УЗЕ, шт", "УЗЕ, €"];
+  const cell = v => { const s = v == null ? "" : String(v).replace(/\r?\n/g, " "); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const num = v => v == null ? "" : String(Number(v)).replace(".", ",");
+  const rows = LOG.map(r => [fmtDate(r.created_at), r.profiles && r.profiles.full_name, r.profiles && r.profiles.filial,
+    r.client_name, r.city, r.kp_number, TYPE[r.system_type] || r.system_type, PLACE[r.placement] || "",
+    num(r.installed_dc_kwp), num(r.battery_kwh), num(r.total_price_usd), r.uze_id, num(r.uze_qty), num(r.uze_total_eur)]);
+  const csv = "﻿" + [head, ...rows].map(r => r.map(cell).join(";")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `KP_${($("from").value || "all")}_${($("to").value || "now")}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
 function range() {
   const f = $("from").value ? new Date($("from").value).toISOString() : null;
   const t = $("to").value ? new Date(new Date($("to").value).getTime() + 86400000).toISOString() : null;
@@ -51,21 +70,22 @@ async function load() {
     <td class="num"><b>${nf(r.kp_count)}</b></td><td class="num">${nf(r.sum_usd)}</td><td class="num">${nf(r.sum_uze_eur)}</td>
     <td>${r.last_at ? fmtDate(r.last_at) : "—"}</td></tr>`).join("") || "<tr><td colspan='6'>Немає даних</td></tr>";
 
-  let q = sb.from("kp_log").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(200);
+  let q = sb.from("kp_log").select("*, profiles(full_name, filial)").order("created_at", { ascending: false }).limit(2000);
   if (f) q = q.gte("created_at", f); if (t) q = q.lt("created_at", t);
   const l = await q;
   if (l.error) { $("logNote").textContent = l.error.message; return; }
+  LOG = l.data;
   $("log").querySelector("tbody").innerHTML = l.data.map(r => `<tr><td>${fmtDate(r.created_at)}</td>
     <td>${esc(r.profiles && r.profiles.full_name)}</td><td>${esc(r.client_name)}</td><td>${esc(r.kp_number)}</td>
     <td>${TYPE[r.system_type] || esc(r.system_type)}</td><td class="num">${nf(r.installed_dc_kwp, 1)}</td>
     <td class="num">${nf(r.battery_kwh, 1)}</td><td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td></tr>`).join("")
     || "<tr><td colspan='9'>Немає КП за період</td></tr>";
-  $("logNote").textContent = l.data.length >= 200 ? "Показано останні 200 записів." : "";
+  $("logNote").textContent = l.data.length >= 2000 ? "Показано останні 2000 записів — звузьте період." : "";
 }
 (async () => {
   const a = await requireAuth("admin"); if (!a) return;
   const d = new Date(); $("from").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  $("apply").onclick = load;
+  $("apply").onclick = load; $("csv").onclick = exportCsv;
   document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
     if (b.dataset.q === "all") { $("from").value = ""; $("to").value = ""; }
     else { $("from").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`; $("to").value = ""; }

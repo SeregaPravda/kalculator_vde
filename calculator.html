@@ -39,10 +39,6 @@
     <div class="hint" id="uzeHint"></div></div>
   <div class="uzeonly hide"><label class="f">Цільова ємність УЗЕ, кВт·год</label>
     <input type="number" id="fUzeKwh" value="261" min="0" step="any"></div>
-  <div><label class="f">Фото для титульної сторінки</label>
-    <input type="file" id="fPhoto" accept="image/*">
-    <img id="photoThumb" class="thumb"><div class="hint">За замовчуванням стоїть стандартне фото.
-    <a href="#" id="resetPhoto" style="color:var(--o)">Повернути стандартне</a></div></div>
  </div>
 
  <div class="adv"><div class="advh" onclick="toggleAdv()">▸ Обладнання та додаткові параметри</div>
@@ -101,28 +97,16 @@
  <div class="grid">
   <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
   <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
-  <div><label class="f">Номер КП</label><input id="mDoc" placeholder="напр. 2026-0815"></div>
+  <div><label class="f">Номер КП</label><input id="mDoc" placeholder="автоматично при друку"></div>
   <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
  </div>
  <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
 </div>
 
-<div class="card"><h2>Цифри компанії для 2-ї сторінки</h2>
- <div class="grid">
-  <div><label class="f">Років на ринку</label><input id="sYears" value="26"></div>
-  <div><label class="f">Філій</label><input id="sBranch" value="5"></div>
-  <div><label class="f">Реалізованих промислових об'єктів</label><input id="sObj" value="600+"></div>
-  <div><label class="f">У портфелі, МВт</label><input id="sMw" value="50"></div>
- </div>
- <div class="hint" style="margin-top:10px">Логотипи клієнтів на 2-й сторінці — це рамки-заглушки.
-  Ставити туди реальні знаки можна лише за письмової згоди клієнта: чужа торговельна марка
-  в рекламному матеріалі без дозволу — це юридичний і репутаційний ризик. Безпечна альтернатива —
-  описи без назв: «агрохолдинг, 400 кВт».</div>
-</div>
 
 <div class="card"><h2>Мої останні КП</h2>
- <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th></tr></thead><tbody></tbody></table>
- <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції».</div>
+ <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th><th></th></tr></thead><tbody></tbody></table>
+ <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції». Номер КП присвоюється автоматично (РРРР-NNNN), якщо поле порожнє. «Повторити» відновлює всі параметри того КП.</div>
 </div>
 
 <div style="text-align:center;padding:6px 0 30px">
@@ -152,7 +136,48 @@ function fillPanels(sel) {
   $("fPanel").innerHTML = D.panels.map(p =>
     `<option value="${p.w}"${p.w === sel ? " selected" : ""}>${p.model} · ${p.w} Вт</option>`).join("");
 }
-let PHOTO = DEFAULT_PHOTO, PHOTO_FIT = "contain", manualInv = false;
+const PHOTO = DEFAULT_PHOTO;                       // стандартне фото титулу, зашите
+const COMPANY_STATS = { years: "26", branch: "5", obj: "600+", mw: "50" };  // цифри 2-ї сторінки
+let manualInv = false;
+
+/* Ціни УЗЕ завантажуються з Supabase (uze_prices) і приводяться до формату D.uze */
+async function loadUzePrices() {
+  const { data, error } = await sb.from("uze_prices").select("*").eq("active", true).order("sort");
+  if (error || !data || !data.length) { D.uze = []; return "Не вдалося завантажити ціни УЗЕ" + (error ? ": " + error.message : ""); }
+  D.uze = data.map(u => {
+    const withVat = u.vat_in ? Number(u.price_eur) : +(Number(u.price_eur) * 1.2).toFixed(2);
+    return { id: u.uze_id, brand: u.brand, model: u.model, kind: u.kind, kw: Number(u.kw), kwh: Number(u.kwh),
+             cooling: u.cooling, priceEur: Number(u.price_eur), vatIn: u.vat_in ? "Так" : "Ні", incoterm: u.incoterm,
+             included: u.included, warranty: u.warranty, source: u.source,
+             withVatEur: withVat, eurPerKwh: +(withVat / Number(u.kwh)).toFixed(1) };
+  });
+  return null;
+}
+
+/* ---- стан форми: серіалізація для повтору КП з історії ---- */
+const FORM_IDS = ["fDc","fUnit","fAc","fBatKwh","fPanel","fTariff","fUzeKind","fUze","fUzeKwh","fInvModel","fInvKw","fInvQty",
+                  "mVideo","fBackup","fEff","fExport","fTilt","fAz","fFx","fFxEur","fUzeK","fYears","fMode","mClient","mCity","mValid"];
+function formState() {
+  const o = { S: { ...S }, manualInv, manualPanel, v: {} };
+  FORM_IDS.forEach(id => o.v[id] = $(id).value);
+  return o;
+}
+function restoreState(st) {
+  if (!st || !st.S) return;
+  Object.assign(S, st.S);
+  ["segType","segPlace","segUze"].forEach((id, i) => {
+    const key = ["type","place","addUze"][i];
+    $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === S[key]));
+  });
+  syncVisibility();
+  fillModels(st.v.fInvModel); fillPanels(Number(st.v.fPanel)); fillUze();
+  FORM_IDS.forEach(id => { if (st.v[id] != null) $(id).value = st.v[id]; });
+  if ($("fUzeKind").value !== st.v.fUzeKind) { $("fUzeKind").value = st.v.fUzeKind; fillUze(); $("fUze").value = st.v.fUze; }
+  manualInv = !!st.manualInv; manualPanel = !!st.manualPanel;
+  $("mDoc").value = "";
+  run();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 function seg(id, key) {
   $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -306,7 +331,7 @@ function run() {
 
   /* ---- УЗЕ (ціни відкриті, рахується в браузері) ---- */
   let UZ = null;
-  if (uzeActive()) {
+  if (uzeActive() && D.uze.length) {
     const u = curUze();
     const targetKwh = Number($("fUzeKwh").value) || 0;
     const qty = u && u.kwh && targetKwh > 0 ? Math.ceil(targetKwh / u.kwh) : 0;
@@ -549,8 +574,7 @@ function buildOffer() {
               phone: ME.phone || "", mail: ME.email || "", client: $("mClient").value,
               city: $("mCity").value, doc: $("mDoc").value, valid: $("mValid").value,
               video: $("mVideo").value };
-  const st = { years: $("sYears").value, branch: $("sBranch").value,
-               obj: $("sObj").value, mw: $("sMw").value };
+  const st = COMPANY_STATS;
   const pw = nf(CFG.kwp, CFG.kwp % 1 ? 1 : 0);
   const acw = nf(CFG.actualAc, CFG.actualAc % 1 ? 1 : 0);
   const foot = `<div class="foot">${CO.name} · ${CO.site}</div>`;
@@ -744,11 +768,20 @@ ${bessOnly ? "" : `<div class="pg">
 async function printOffer() {
   if (PRICE_PENDING) { await new Promise(r => setTimeout(r, 600)); }
   if (S.type !== "bess" && CFG.kwp > 0 && !PR) { alert("Ціна ще не отримана з сервера. Спробуйте ще раз."); return; }
-  const { data, error } = await sb.rpc("calculate_quote", { p: quoteParams(), do_log: true });
+  const p = quoteParams(); p.params = formState();
+  const { data, error } = await sb.rpc("calculate_quote", { p, do_log: true });
   if (error) { alert("Не вдалося зафіксувати КП: " + error.message); return; }
-  if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); render(); }
+  if (data.kp_number) $("mDoc").value = data.kp_number;      // автономер, якщо поле було порожнє
+  if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); }
+  render();
   loadHistory();
   setTimeout(() => window.print(), 50);
+}
+let HIST = [];
+function repeatKp(id) {
+  const r = HIST.find(x => x.id === id);
+  if (!r || !r.params) { alert("Для цього КП параметри не збережені."); return; }
+  restoreState(r.params);
 }
 const TYPE_LABEL = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
 async function loadHistory() {
@@ -756,10 +789,12 @@ async function loadHistory() {
     .order("created_at", { ascending: false }).limit(15);
   const tb = $("histTbl").querySelector("tbody");
   if (error) { tb.innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`; return; }
+  HIST = data;
   tb.innerHTML = data.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(r.client_name)}</td><td>${esc(r.kp_number)}</td>
     <td>${TYPE_LABEL[r.system_type] || esc(r.system_type)}</td><td class="num">${nf(r.installed_dc_kwp, 1)}</td>
-    <td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td></tr>`).join("")
-    || "<tr><td colspan='7' class='muted'>Ще немає зафіксованих КП</td></tr>";
+    <td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td>
+    <td>${r.params ? `<a href="#" onclick="repeatKp(${r.id});return false" style="color:var(--o);font-weight:bold">Повторити</a>` : ""}</td></tr>`).join("")
+    || "<tr><td colspan='8' class='muted'>Ще немає зафіксованих КП</td></tr>";
 }
 
 /* ------------------------------------------------------------- події */
@@ -774,28 +809,18 @@ $("fUze").addEventListener("change", run);
   manualInv = true;
   if (id === "fInvModel") { const x = pool().find(v => v.model === $("fInvModel").value); if (x) $("fInvKw").value = x.ac; }
   run(); }));
-["mClient", "mCity", "mDoc", "mValid", "mVideo", "sYears", "sBranch", "sObj", "sMw"]
+["mClient", "mCity", "mDoc", "mValid", "mVideo"]
   .forEach(id => $(id).addEventListener("input", buildOffer));
-$("fPhoto").addEventListener("change", e => {
-  const f = e.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = ev => { PHOTO = ev.target.result; PHOTO_FIT = "cover"; showThumb(); buildOffer(); };
-  r.readAsDataURL(f); });
-$("resetPhoto").addEventListener("click", e => {
-  e.preventDefault(); PHOTO = DEFAULT_PHOTO; PHOTO_FIT = "contain";
-  $("fPhoto").value = ""; showThumb(); buildOffer(); });
-function showThumb() {
-  const t = $("photoThumb");
-  if (PHOTO) { t.src = PHOTO; t.style.display = "block"; } else t.style.display = "none";
-}
 
 /* ------------------------------------------------------------- старт */
 (async () => {
   const a = await requireAuth(); if (!a) return;
   ME = a.profile; IS_ADMIN = ME.role === "admin";
   $("mgrLine").textContent = `${ME.full_name} · ${ME.position || ""} · ${ME.filial} · ${ME.phone || ""} · ${ME.email || a.session.user.email}`;
+  const uzeErr = await loadUzePrices();
+  if (uzeErr) $("warnBox").insertAdjacentHTML("afterbegin", `<div class="alert warn">${esc(uzeErr)}</div>`);
   seg("segType", "type"); seg("segPlace", "place"); seg("segUze", "addUze");
-  showThumb(); fillUze(); syncVisibility(); autoAc();
+  fillUze(); syncVisibility(); autoAc();
   loadHistory();
 })();
 </script>
