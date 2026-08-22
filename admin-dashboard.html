@@ -18,8 +18,16 @@
  </div>
  <div class="kpis" id="kpis"></div>
  <div style="height:16px"></div>
+ <div class="g2">
+  <div class="card"><h2>Кількість КП по менеджерах</h2><div class="chartbox"><div id="chartCount"></div></div></div>
+  <div class="card"><h2>Середній чек СЕС по менеджерах, $</h2><div class="chartbox"><div id="chartAvg"></div></div></div>
+ </div>
  <div class="card"><h2>По менеджерах</h2>
-  <table id="stat"><thead><tr><th>Менеджер</th><th>Філія</th><th class="num">КП, шт</th><th class="num">Сума СЕС, $</th><th class="num">Сума УЗЕ, €</th><th>Останнє КП</th></tr></thead><tbody></tbody></table>
+  <div style="overflow-x:auto"><table id="stat"><thead><tr><th>Менеджер</th><th>Філія</th><th class="num">КП, шт</th><th class="num">Середній чек, $</th><th class="num">Середня потужність, кВт</th><th class="num">Сума СЕС, $</th><th class="num">Сума кВт</th><th class="num">Сума УЗЕ, €</th><th>Останнє КП</th></tr></thead><tbody></tbody></table></div>
+  <div class="muted" style="margin-top:8px">Середній чек — середня вартість СЕС по КП, де є PV-частина (BESS-тільки КП не враховуються). Сума — орієнтовний обсяг запропонованого.</div>
+ </div>
+ <div class="card"><h2>По філіях</h2>
+  <table id="filial"><thead><tr><th>Філія</th><th class="num">Менеджерів</th><th class="num">КП, шт</th><th class="num">Середній чек, $</th><th class="num">Сума СЕС, $</th><th class="num">Сума кВт</th></tr></thead><tbody></tbody></table>
  </div>
  <div class="card"><h2>Останні КП</h2>
   <table id="log"><thead><tr><th>Дата</th><th>Менеджер</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">АКБ, кВт·год</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th></tr></thead><tbody></tbody></table>
@@ -63,12 +71,32 @@ async function load() {
   const total = rows.reduce((a, r) => a + Number(r.kp_count), 0);
   const usd = rows.reduce((a, r) => a + Number(r.sum_usd), 0);
   const eur = rows.reduce((a, r) => a + Number(r.sum_uze_eur), 0);
-  $("kpis").innerHTML = [[nf(total), "КП за період", "o"], [nf(usd), "Сума СЕС, $", ""], [nf(eur), "Сума УЗЕ, €", ""],
-    [nf(rows.filter(r => Number(r.kp_count) > 0).length), "Активних менеджерів", "o"]]
+  const kwp = rows.reduce((a, r) => a + Number(r.sum_kwp), 0);
+  const withPv = rows.filter(r => r.avg_usd != null);
+  const avgAll = withPv.length ? usd / withPv.reduce((a, r) => a + Number(r.kp_count), 0) : null;
+  $("kpis").innerHTML = [[nf(total), "КП за період", "o"], [avgAll ? nf(avgAll) : "—", "Середній чек СЕС, $", "o"],
+    [nf(usd), "Сума СЕС, $", ""], [nf(kwp), "Сума потужності, кВт", ""], [nf(eur), "Сума УЗЕ, €", ""],
+    [nf(rows.filter(r => Number(r.kp_count) > 0).length) + " / " + nf(rows.length), "Активних менеджерів", ""]]
     .map(k => `<div class="kpi"><div class="v ${k[2]}">${k[0]}</div><div class="l">${k[1]}</div></div>`).join("");
   $("stat").querySelector("tbody").innerHTML = rows.map(r => `<tr><td>${esc(r.full_name)}</td><td>${esc(r.filial)}</td>
-    <td class="num"><b>${nf(r.kp_count)}</b></td><td class="num">${nf(r.sum_usd)}</td><td class="num">${nf(r.sum_uze_eur)}</td>
-    <td>${r.last_at ? fmtDate(r.last_at) : "—"}</td></tr>`).join("") || "<tr><td colspan='6'>Немає даних</td></tr>";
+    <td class="num"><b>${nf(r.kp_count)}</b></td><td class="num"><b>${r.avg_usd != null ? nf(r.avg_usd) : "—"}</b></td>
+    <td class="num">${r.avg_kwp != null ? nf(r.avg_kwp, 1) : "—"}</td>
+    <td class="num">${nf(r.sum_usd)}</td><td class="num">${nf(r.sum_kwp)}</td><td class="num">${nf(r.sum_uze_eur)}</td>
+    <td>${r.last_at ? fmtDate(r.last_at) : "—"}</td></tr>`).join("") || "<tr><td colspan='9'>Немає даних</td></tr>";
+
+  /* по філіях */
+  const F = {};
+  rows.forEach(r => { const f = F[r.filial] || (F[r.filial] = { n: 0, kp: 0, usd: 0, kwp: 0, pvKp: 0 });
+    f.n++; f.kp += Number(r.kp_count); f.usd += Number(r.sum_usd); f.kwp += Number(r.sum_kwp);
+    if (r.avg_usd != null) f.pvKp += Number(r.kp_count); });
+  $("filial").querySelector("tbody").innerHTML = Object.entries(F).sort((a, b) => b[1].kp - a[1].kp).map(([name, f]) =>
+    `<tr><td>${esc(name)}</td><td class="num">${f.n}</td><td class="num"><b>${nf(f.kp)}</b></td>
+     <td class="num">${f.pvKp ? nf(f.usd / f.pvKp) : "—"}</td><td class="num">${nf(f.usd)}</td><td class="num">${nf(f.kwp)}</td></tr>`).join("");
+
+  /* графіки */
+  const short = n => { const p = String(n || "").split(" "); return p[0] + (p[1] ? " " + p[1][0] + "." : ""); };
+  drawBars("chartCount", rows.filter(r => Number(r.kp_count) > 0).map(r => ({ l: short(r.full_name), v: Number(r.kp_count) })), "");
+  drawBars("chartAvg", rows.filter(r => r.avg_usd != null).sort((a, b) => b.avg_usd - a.avg_usd).map(r => ({ l: short(r.full_name), v: Number(r.avg_usd) })), "$");
 
   let q = sb.from("kp_log").select("*, profiles(full_name, filial)").order("created_at", { ascending: false }).limit(2000);
   if (f) q = q.gte("created_at", f); if (t) q = q.lt("created_at", t);
@@ -81,6 +109,19 @@ async function load() {
     <td class="num">${nf(r.battery_kwh, 1)}</td><td class="num">${nf(r.total_price_usd)}</td><td class="num">${nf(r.uze_total_eur)}</td></tr>`).join("")
     || "<tr><td colspan='9'>Немає КП за період</td></tr>";
   $("logNote").textContent = l.data.length >= 2000 ? "Показано останні 2000 записів — звузьте період." : "";
+}
+
+/* горизонтальні стовпчики: [{l, v}] */
+function drawBars(el, data, unit) {
+  if (!data.length) { $(el).innerHTML = "<div class='muted'>Немає даних за період</div>"; return; }
+  const W = 460, rowH = 26, L = 120, R = 70, H = data.length * rowH + 8;
+  const max = Math.max(...data.map(d => d.v), 1);
+  let g = "";
+  data.forEach((d, i) => { const y = 4 + i * rowH, w = (W - L - R) * d.v / max;
+    g += `<text x="${L - 8}" y="${y + 17}" text-anchor="end" font-size="12" fill="#2D2926">${esc(d.l)}</text>`;
+    g += `<rect x="${L}" y="${y + 4}" width="${Math.max(w, 2)}" height="${rowH - 10}" rx="3" fill="#FE5000"/>`;
+    g += `<text x="${L + w + 6}" y="${y + 17}" font-size="12" font-weight="bold" fill="#2D2926">${nf(d.v)}${unit ? " " + unit : ""}</text>`; });
+  $(el).innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-family:Arial">${g}</svg>`;
 }
 (async () => {
   const a = await requireAuth("admin"); if (!a) return;

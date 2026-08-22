@@ -97,7 +97,7 @@
  <div class="grid">
   <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
   <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
-  <div><label class="f">Номер КП</label><input id="mDoc" placeholder="автоматично при друку"></div>
+  <div><label class="f">Номер КП</label><input id="mDoc" readonly value="" placeholder="присвоїться при друку" style="background:#F5F4F2;color:var(--muted)"></div>
   <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
  </div>
  <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
@@ -106,7 +106,7 @@
 
 <div class="card"><h2>Мої останні КП</h2>
  <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th><th></th></tr></thead><tbody></tbody></table>
- <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції». Номер КП присвоюється автоматично (РРРР-NNNN), якщо поле порожнє. «Повторити» відновлює всі параметри того КП.</div>
+ <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції», номер РРРР-NNNN присвоюється автоматично. «Повторити» відновлює всі параметри того КП (новий друк отримає новий номер).</div>
 </div>
 
 <div style="text-align:center;padding:6px 0 30px">
@@ -251,7 +251,7 @@ function quoteParams() {
     uze_id: CFG.UZ && CFG.UZ.qty ? CFG.UZ.id : null,
     uze_qty: CFG.UZ && CFG.UZ.qty ? CFG.UZ.qty : null,
     uze_total_eur: CFG.UZ && CFG.UZ.qty ? CFG.UZ.totalEur : null,
-    client_name: $("mClient").value, city: $("mCity").value, kp_number: $("mDoc").value
+    client_name: $("mClient").value, city: $("mCity").value, kp_number: ""   // номер завжди генерує сервер
   };
 }
 function applyQuote(q) {
@@ -778,7 +778,7 @@ async function printOffer() {
   const p = quoteParams(); p.params = formState();
   const { data, error } = await sb.rpc("calculate_quote", { p, do_log: true });
   if (error) { alert("Не вдалося зафіксувати КП: " + error.message); return; }
-  if (data.kp_number) $("mDoc").value = data.kp_number;      // автономер, якщо поле було порожнє
+  if (data.kp_number) $("mDoc").value = data.kp_number;      // показуємо присвоєний сервером номер
   if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); }
   render();
   loadHistory();
@@ -816,7 +816,7 @@ $("fUze").addEventListener("change", run);
   manualInv = true;
   if (id === "fInvModel") { const x = pool().find(v => v.model === $("fInvModel").value); if (x) $("fInvKw").value = x.ac; }
   run(); }));
-["mClient", "mCity", "mDoc", "mValid", "mVideo"]
+["mClient", "mCity", "mValid", "mVideo"]
   .forEach(id => $(id).addEventListener("input", buildOffer));
 
 /* ------------------------------------------------------------- старт */
