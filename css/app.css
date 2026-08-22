@@ -113,7 +113,7 @@ tfoot td{font-weight:bold;background:#FDF1EA;border-top:2px solid var(--o)}
 #offer .lgrow{display:flex;justify-content:flex-end;align-items:center;gap:7px;font-size:9px}
 #offer .lg1{color:var(--o);font-weight:bold;letter-spacing:.02em}
 #offer .lg2{border:1.5px solid var(--o);color:var(--o);font-weight:bold;padding:3px 9px;letter-spacing:.06em;font-size:9.5px}
-#offer .bighead{font-size:48px;line-height:.98;font-weight:bold;color:var(--o);letter-spacing:-.01em;margin:7mm 0 0}
+#offer .bighead{font-size:40px;line-height:.98;font-weight:bold;color:var(--o);letter-spacing:-.01em;margin:7mm 0 0}
 #offer .covsub{font-size:14px;font-weight:bold;color:var(--g);margin-top:4mm}
 #offer .photoband{flex:1;min-height:98mm;margin:5mm 0 0;background-color:transparent;
   background-position:center;background-repeat:no-repeat;background-size:contain}
