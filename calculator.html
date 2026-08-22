@@ -138,6 +138,9 @@ function fillPanels(sel) {
 }
 const PHOTO = DEFAULT_PHOTO;                       // стандартне фото титулу, зашите
 const COMPANY_STATS = { years: "26", branch: "5", obj: "600+", mw: "50" };  // цифри 2-ї сторінки
+/* Логотипи клієнтів на 2-й сторінці КП (з буклету «Електромонтаж», стор. 2) */
+const CLIENT_LOGOS = [["greco","GRECO group"],["kernel","Kernel"],["lustdorf","Люстдорф"],["mhp","МХП"],["molokia","Молокія"],["tas_agro","TAS Agro"],
+                      ["interjuice","Interjuice"],["tom","ТОМ"],["khlibprom","Концерн Хлібпром"],["gadz","GADZ"],["ekosfera","Екосфера"],["grain_alliance","Grain Alliance"]];
 let manualInv = false;
 
 /* Ціни УЗЕ завантажуються з Supabase (uze_prices) і приводяться до формату D.uze */
@@ -644,7 +647,7 @@ function buildOffer() {
   проєктного розрахунку після виїзду на об'єкт.</p>
 
  <h3 style="margin-top:14px">Серед наших клієнтів у напрямку ВДЕ</h3>
- <div class="clients">${Array.from({length:12}).map(() => `<div class="clogo">логотип клієнта</div>`).join("")}</div>
+ <div class="clients">${CLIENT_LOGOS.map(l => `<div class="clogo"><img src="img/clients/${l[0]}.png" alt="${l[1]}"></div>`).join("")}</div>
  <div style="flex:1"></div>
  <div class="stats" style="margin-bottom:6mm">
   <div class="stat"><div class="n">${st.years}</div><div class="c">років на ринку</div></div>
