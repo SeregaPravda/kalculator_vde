@@ -139,12 +139,13 @@ tfoot td{font-weight:bold;background:#FDF1EA;border-top:2px solid var(--o)}
 #offer .stat .c{font-size:10px;line-height:1.35;margin-top:5px;opacity:.92}
 
 /* --- реалізовані проєкти --- */
-#offer .projects{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:3mm}
-#offer .pcard{border:1px solid var(--line);border-radius:4px;padding:2.5mm}
-#offer .pph{height:17mm;background:#F7F5F3;border-radius:3px;display:flex;align-items:center;
-  justify-content:center;font-size:9px;color:var(--muted)}
-#offer .pcard .t{font-size:10px;font-weight:bold;margin-top:2mm;line-height:1.2}
-#offer .pcard .p{font-size:10px;color:var(--o);font-weight:bold;margin:2px 0 0}
+#offer .projects{display:grid;grid-template-columns:repeat(4,1fr);gap:2.5mm;margin-top:3mm}
+#offer .pcard{border:1px solid var(--line);border-radius:4px;padding:2mm;overflow:hidden}
+#offer .pph{height:22mm;background:#F7F5F3;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-size:9px;color:var(--muted);overflow:hidden}
+#offer .pph img{width:100%;height:100%;object-fit:cover;display:block}
+#offer .pcard .t{font-size:8.5px;font-weight:bold;margin-top:1.5mm;line-height:1.2;min-height:2.4em}
+#offer .pcard .p{font-size:8.5px;color:var(--o);font-weight:bold;margin:2px 0 0;line-height:1.2}
 #offer .combo{padding:0;display:flex;flex-direction:column}
 #offer .combo .topsec{padding:13mm 16mm 5mm}
 #offer .combo .botsec{margin-top:auto;background:var(--o)!important;color:#fff;padding:10mm 16mm 10mm}

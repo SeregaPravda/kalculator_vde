@@ -322,3 +322,51 @@ update public.profiles set
   role = 'admin', full_name = 'admin', position = 'Адміністратор',
   filial = 'Вінниця', phone = '+380674334333', email = 'admin@admin'
 where id = (select id from auth.users where email = 'admin@admin');
+
+-- ------------------------------------------------ ОЧІКУВАНІ ПРОФІЛІ МЕНЕДЖЕРІВ
+-- Адмін заводить акаунт у Supabase Auth (Add user) з цією поштою → тригер
+-- handle_new_user бере ПІБ/телефон/філію звідси, а не лишає порожній профіль.
+create table if not exists public.pending_profiles (
+  email     text primary key,
+  full_name text not null,
+  phone     text,
+  filial    text not null default 'Вінниця',
+  position  text default 'Менеджер напрямку ВДЕ',
+  role      text not null default 'manager' check (role in ('manager','admin'))
+);
+alter table public.pending_profiles enable row level security;
+drop policy if exists pending_profiles_admin on public.pending_profiles;
+create policy pending_profiles_admin on public.pending_profiles for all
+  using (public.is_admin()) with check (public.is_admin());
+
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare pp public.pending_profiles%rowtype;
+begin
+  select * into pp from public.pending_profiles where lower(email) = lower(new.email);
+  insert into public.profiles (id, email, full_name, phone, filial, position, role)
+  values (new.id, new.email,
+          coalesce(pp.full_name, new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+          pp.phone, coalesce(pp.filial, 'Вінниця'), coalesce(pp.position, 'Менеджер напрямку ВДЕ'), coalesce(pp.role, 'manager'))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+insert into public.pending_profiles (email, full_name, phone, filial) values
+  ('dmytro.osadchuk@pa.ua',       'Осадчук Дмитро',        '+380966777877', 'Вінниця'),
+  ('oleksandr.velhus@pa.ua',      'Вельгус Олександр',     '+380674308108', 'Вінниця'),
+  ('mykola.maksymenko@pa.ua',     'Максименко Микола',     '+380984606896', 'Вінниця'),
+  ('kostiantyn.podolynnyi@pa.ua', 'Подолинний Костянтин',  '+380935566508', 'Вінниця'),
+  ('mykhailo.martyniuk@pa.ua',    'Мартинюк Михайло',      '+380676538347', 'Хмельницький'),
+  ('illia.tymtsias@pa.ua',        'Тимцясь Ілля',          '+380971044255', 'Хмельницький'),
+  ('andrii.kichura@pa.ua',        'Кічура Андрій',         '+380978699266', 'Львів'),
+  ('pavlo.boichuk@pa.ua',         'Бойчук Павло',          '+380673534523', 'Львів'),
+  ('yurii.dublianko@pa.ua',       'Дублянко Юрій',         '+380670080883', 'Львів'),
+  ('mariia.olesenko@pa.ua',       'Олесенко Марія',        '+380930502017', 'Київ'),
+  ('andrushchak@pa.ua',           'Андрущак Сергій',       '+380632600827', 'Вінниця')
+on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial;
+
+-- Якщо акаунт уже існує, а профіль ще порожній — дозаповнити
+update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial
+from public.pending_profiles pp
+where lower(p.email) = lower(pp.email) and (p.full_name = '' or p.full_name = split_part(p.email, '@', 1));
