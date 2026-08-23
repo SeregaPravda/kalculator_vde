@@ -9,7 +9,7 @@
 <div class="top">
   <div><h1>Калькулятор індикативних КП</h1>
        <div class="sub">Орієнтовний розрахунок генерації та вартості СЕС · вебверсія 3.0</div></div>
-  <button class="btn" onclick="printOffer()">PDF / Друк пропозиції</button>
+  <button class="btn" onclick="printOffer()">Сформувати КП</button>
 </div>
 
 <div class="card"><h2>Параметри станції</h2>
@@ -97,7 +97,7 @@
  <div class="grid">
   <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
   <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
-  <div><label class="f">Номер КП</label><input id="mDoc" readonly value="" placeholder="присвоїться при друку" style="background:#F5F4F2;color:var(--muted)"></div>
+  <div><label class="f">Номер КП</label><input id="mDoc" readonly value="" placeholder="присвоїться при формуванні" style="background:#F5F4F2;color:var(--muted)"></div>
   <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
  </div>
  <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
@@ -106,11 +106,11 @@
 
 <div class="card"><h2>Мої останні КП</h2>
  <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th><th></th></tr></thead><tbody></tbody></table>
- <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «PDF / Друк пропозиції», номер РРРР-NNNN присвоюється автоматично. «Повторити» відновлює всі параметри того КП (новий друк отримає новий номер).</div>
+ <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «Сформувати КП» і відкривається в новій вкладці для перегляду — звідти його зберігають у PDF або друкують. Номер РРРР-NNNN присвоюється автоматично. «Повторити» відновлює всі параметри того КП (новий друк отримає новий номер).</div>
 </div>
 
 <div style="text-align:center;padding:6px 0 30px">
-  <button class="btn" onclick="printOffer()">PDF / Друк пропозиції</button></div>
+  <button class="btn" onclick="printOffer()">Сформувати КП</button></div>
 </div></div>
 
 <div id="offer"></div>
@@ -772,17 +772,25 @@ ${bessOnly ? "" : `<div class="pg">
 
 
 /* ------------------------------------------------------- друк + лог КП */
+/* «Сформувати КП»: фіксує КП на сервері (номер + лог) і відкриває готовий документ
+   у новій вкладці (kp.html). Друк або збереження в PDF менеджер робить уже звідти. */
 async function printOffer() {
   if (PRICE_PENDING) { await new Promise(r => setTimeout(r, 600)); }
   if (S.type !== "bess" && CFG.kwp > 0 && !PR) { alert("Ціна ще не отримана з сервера. Спробуйте ще раз."); return; }
+  // вкладку відкриваємо одразу по кліку — інакше браузер заблокує як спливаюче вікно
+  const w = window.open("", "_blank");
+  if (w) w.document.write("<title>Формую КП…</title><p style=\"font-family:Arial;padding:30px\">Формую КП…</p>");
   const p = quoteParams(); p.params = formState();
   const { data, error } = await sb.rpc("calculate_quote", { p, do_log: true });
-  if (error) { alert("Не вдалося зафіксувати КП: " + error.message); return; }
+  if (error) { if (w) w.close(); alert("Не вдалося зафіксувати КП: " + error.message); return; }
   if (data.kp_number) $("mDoc").value = data.kp_number;      // показуємо присвоєний сервером номер
   if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); }
   render();
   loadHistory();
-  setTimeout(() => window.print(), 50);
+  sessionStorage.setItem("kp_html", $("offer").innerHTML);
+  sessionStorage.setItem("kp_num", data.kp_number || "");
+  sessionStorage.setItem("kp_client", $("mClient").value || "");
+  if (w) w.location.href = "kp.html"; else location.href = "kp.html";
 }
 let HIST = [];
 function repeatKp(id) {

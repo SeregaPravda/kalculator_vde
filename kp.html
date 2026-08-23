@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Індикативна пропозиція</title>
+<link rel="stylesheet" href="css/app.css">
+<style>
+/* Сторінка перегляду КП: показуємо тільки згенеровані аркуші + панель дій */
+html,body{margin:0;background:#5f5b58}
+#offer{display:block;padding:22px 0 40px}
+#offer .pg{box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.bar{position:sticky;top:0;z-index:10;background:var(--g);color:var(--w);padding:10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px}
+.bar .btn{padding:9px 18px}
+.bar .ghost{background:transparent;border:1px solid rgba(255,255,255,.5);color:var(--w)}
+.bar .hint{color:rgba(255,255,255,.75);font-size:12px;margin:0;line-height:1.35}
+.bar .num{font-weight:bold;font-size:14px}
+.empty{max-width:520px;margin:80px auto;background:var(--w);border-radius:10px;padding:26px;font-size:14px}
+@media print{
+  html,body{background:#fff}
+  .bar{display:none!important}
+  #offer{padding:0}
+  #offer .pg{box-shadow:none}
+}
+</style></head><body>
+<div class="bar">
+  <span class="num" id="kpNum">КП</span>
+  <button class="btn" onclick="window.print()">Зберегти PDF / Друкувати</button>
+  <button class="btn ghost" onclick="window.close()">Закрити</button>
+  <p class="hint">У діалозі друку: <b>Принтер — «Зберегти як PDF»</b> · <b>Поля — «Немає»</b> · <b>Фонова графіка — увімкнено</b> · колонтитули — вимкнено.
+  Інакше браузер додасть свої поля, і кожен аркуш розірветься на два.</p>
+</div>
+<div id="offer"></div>
+<script>
+(() => {
+  const html = sessionStorage.getItem("kp_html");
+  const num = sessionStorage.getItem("kp_num") || "";
+  const client = sessionStorage.getItem("kp_client") || "";
+  if (!html) {
+    document.getElementById("offer").innerHTML = '<div class="empty">Немає сформованого КП. Поверніться в калькулятор і натисніть «Сформувати КП».</div>';
+    return;
+  }
+  document.getElementById("offer").innerHTML = html;
+  document.getElementById("kpNum").textContent = "КП № " + num + (client ? " · " + client : "");
+  document.title = "КП " + num + (client ? " · " + client : "");
+})();
+</script>
+</body></html>
