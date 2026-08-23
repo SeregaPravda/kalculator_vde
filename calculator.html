@@ -787,9 +787,9 @@ async function printOffer() {
   if (S.type !== "bess" && CFG.kwp > 0) { applyQuote(data); applyEconomics(); }
   render();
   loadHistory();
-  sessionStorage.setItem("kp_html", $("offer").innerHTML);
-  sessionStorage.setItem("kp_num", data.kp_number || "");
-  sessionStorage.setItem("kp_client", $("mClient").value || "");
+  localStorage.setItem("kp_html", $("offer").innerHTML);
+  localStorage.setItem("kp_num", data.kp_number || "");
+  localStorage.setItem("kp_client", $("mClient").value || "");
   if (w) w.location.href = "kp.html"; else location.href = "kp.html";
 }
 let HIST = [];
