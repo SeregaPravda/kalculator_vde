@@ -7,6 +7,8 @@
 /* Сторінка перегляду КП: показуємо тільки згенеровані аркуші + панель дій */
 html,body{margin:0;background:#5f5b58}
 #offer{display:block;padding:22px 0 40px}
+#wrap{overflow:hidden}
+#offer{transform-origin:top center}
 #offer .pg{box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .bar{position:sticky;top:0;z-index:10;background:var(--g);color:var(--w);padding:10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px}
 .bar .btn{padding:9px 18px}
@@ -17,7 +19,8 @@ html,body{margin:0;background:#5f5b58}
 @media print{
   html,body{background:#fff}
   .bar{display:none!important}
-  #offer{padding:0;zoom:1!important}
+  #offer{padding:0;transform:none!important}
+  #wrap{height:auto!important;overflow:visible}
   #offer .pg{box-shadow:none}
 }
 </style></head><body>
@@ -28,7 +31,7 @@ html,body{margin:0;background:#5f5b58}
   <p class="hint">У діалозі друку: <b>Принтер — «Зберегти як PDF»</b> · <b>Поля — «Немає»</b> · <b>Фонова графіка — увімкнено</b> · колонтитули — вимкнено.
   Інакше браузер додасть свої поля, і кожен аркуш розірветься на два.</p>
 </div>
-<div id="offer"></div>
+<div id="wrap"><div id="offer"></div></div>
 <script>
 (() => {
   let html = null, num = "", client = "";
@@ -41,9 +44,11 @@ html,body{margin:0;background:#5f5b58}
   document.getElementById("kpNum").textContent = "КП № " + num + (client ? " · " + client : "");
   document.title = "КП " + num + (client ? " · " + client : "");
   /* На вузьких екранах (телефон) масштабуємо аркуші А4 під ширину екрана, не змінюючи верстку */
+  const off = document.getElementById("offer"), wrap = document.getElementById("wrap");
   const fit = () => { const pageW = 210 * 96 / 25.4; const k = Math.min(1, (window.innerWidth - 12) / pageW);
-    document.getElementById("offer").style.zoom = k; };
-  fit(); window.addEventListener("resize", fit); window.addEventListener("beforeprint", () => document.getElementById("offer").style.zoom = 1); window.addEventListener("afterprint", fit);
+    off.style.transform = k < 1 ? "scale(" + k + ")" : ""; wrap.style.height = k < 1 ? (off.offsetHeight * k) + "px" : ""; };
+  fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit);
+  window.addEventListener("beforeprint", () => { off.style.transform = ""; wrap.style.height = ""; }); window.addEventListener("afterprint", fit);
 })();
 </script>
 </body></html>

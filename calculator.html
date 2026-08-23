@@ -651,7 +651,7 @@ function buildOffer() {
   проєктного розрахунку після виїзду на об'єкт.</p>
 
  <h3 style="margin-top:14px">Серед наших клієнтів у напрямку ВДЕ</h3>
- <div class="clients">${CLIENT_LOGOS.map(l => `<div class="clogo"><img src="img/clients/${l[0]}.png" alt="${l[1]}"></div>`).join("")}</div>
+ <div class="clients">${CLIENT_LOGOS.map(l => `<div class="clogo" style="background-image:url(img/clients/${l[0]}.png)" title="${l[1]}"></div>`).join("")}</div>
  <div style="flex:1"></div>
  <div class="stats" style="margin-bottom:6mm">
   <div class="stat"><div class="n">${st.years}</div><div class="c">років на ринку</div></div>
@@ -740,7 +740,7 @@ ${bessOnly ? "" : `<div class="pg">
   <h2>Реалізовані проєкти</h2><div class="rule"></div>
   <p class="lead" style="margin-bottom:0">Промислові сонячні електростанції, побудовані групою компаній «Промавтоматика».</p>
   <div class="projects">${PROJECTS.map(p =>
-    `<div class="pcard"><div class="pph">${p[2] ? `<img src="img/projects/${p[2]}" alt="">` : ""}</div><div class="t">${p[0]}</div><div class="p">${p[1] || "&nbsp;"}</div></div>`).join("")}</div>
+    `<div class="pcard"><div class="pph"${p[2] ? ` style="background-image:url(img/projects/${p[2]})"` : ""}></div><div class="t">${p[0]}</div><div class="p">${p[1] || "&nbsp;"}</div></div>`).join("")}</div>
  </div>
  <div class="botsec">
   <h2>Наступний крок</h2>

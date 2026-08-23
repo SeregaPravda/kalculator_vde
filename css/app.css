@@ -132,7 +132,7 @@ tfoot td{font-weight:bold;background:#FDF1EA;border-top:2px solid var(--o)}
 #offer .clients{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3.5mm}
 #offer .clogo{height:19mm;min-width:0;overflow:hidden;box-sizing:border-box;background:#fff;border:1px solid var(--line);border-radius:3px;padding:2.5mm;
   display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);text-align:center;padding:3px}
-#offer .clogo img{width:100%;height:100%;object-fit:contain;display:block}
+#offer .clogo{background-repeat:no-repeat;background-position:center;background-size:contain;background-origin:content-box}
 #offer .stats{display:grid;grid-template-columns:repeat(4,1fr);background:var(--o);color:#fff;
   padding:6mm 5mm;margin-top:4mm}
 #offer .stat .n{font-size:27px;font-weight:bold;line-height:1}
@@ -143,7 +143,7 @@ tfoot td{font-weight:bold;background:#FDF1EA;border-top:2px solid var(--o)}
 #offer .pcard{border:1px solid var(--line);border-radius:4px;padding:2mm;overflow:hidden}
 #offer .pph{height:22mm;background:#F7F5F3;border-radius:3px;display:flex;align-items:center;
   justify-content:center;font-size:9px;color:var(--muted);overflow:hidden}
-#offer .pph img{width:100%;height:100%;object-fit:cover;display:block}
+#offer .pph{background-repeat:no-repeat;background-position:center;background-size:cover}
 #offer .pcard .t{font-size:8.5px;font-weight:bold;margin-top:1.5mm;line-height:1.2;min-height:2.4em}
 #offer .pcard .p{font-size:8.5px;color:var(--o);font-weight:bold;margin:2px 0 0;line-height:1.2}
 #offer .combo{padding:0;display:flex;flex-direction:column}
