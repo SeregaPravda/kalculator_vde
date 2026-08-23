@@ -2,13 +2,13 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Індикативна пропозиція</title>
-<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/app.css?v=202608231321">
 <style>
 /* Сторінка перегляду КП: показуємо тільки згенеровані аркуші + панель дій */
 html,body{margin:0;background:#5f5b58}
 #offer{display:block;padding:22px 0 40px}
 #wrap{overflow:hidden}
-#offer{transform-origin:top center}
+#offer{transform-origin:top left}
 #offer .pg{box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .bar{position:sticky;top:0;z-index:10;background:var(--g);color:var(--w);padding:10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px}
 .bar .btn{padding:9px 18px}
@@ -19,7 +19,7 @@ html,body{margin:0;background:#5f5b58}
 @media print{
   html,body{background:#fff}
   .bar{display:none!important}
-  #offer{padding:0;transform:none!important}
+  #offer{padding:0;transform:none!important;width:auto!important;margin:0!important}
   #wrap{height:auto!important;overflow:visible}
   #offer .pg{box-shadow:none}
 }
@@ -46,9 +46,10 @@ html,body{margin:0;background:#5f5b58}
   /* На вузьких екранах (телефон) масштабуємо аркуші А4 під ширину екрана, не змінюючи верстку */
   const off = document.getElementById("offer"), wrap = document.getElementById("wrap");
   const fit = () => { const pageW = 210 * 96 / 25.4; const k = Math.min(1, (window.innerWidth - 12) / pageW);
-    off.style.transform = k < 1 ? "scale(" + k + ")" : ""; wrap.style.height = k < 1 ? (off.offsetHeight * k) + "px" : ""; };
+    if (k < 1) { off.style.width = pageW + "px"; off.style.transform = "scale(" + k + ")"; off.style.marginLeft = Math.max(0, (window.innerWidth - pageW * k) / 2) + "px"; wrap.style.height = (off.offsetHeight * k) + "px"; }
+    else { off.style.width = ""; off.style.transform = ""; off.style.marginLeft = ""; wrap.style.height = ""; } };
   fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit);
-  window.addEventListener("beforeprint", () => { off.style.transform = ""; wrap.style.height = ""; }); window.addEventListener("afterprint", fit);
+  window.addEventListener("beforeprint", () => { off.style.transform = ""; off.style.width = ""; off.style.marginLeft = ""; wrap.style.height = ""; }); window.addEventListener("afterprint", fit);
 })();
 </script>
 </body></html>
