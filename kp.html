@@ -17,7 +17,7 @@ html,body{margin:0;background:#5f5b58}
 @media print{
   html,body{background:#fff}
   .bar{display:none!important}
-  #offer{padding:0}
+  #offer{padding:0;zoom:1!important}
   #offer .pg{box-shadow:none}
 }
 </style></head><body>
@@ -40,6 +40,10 @@ html,body{margin:0;background:#5f5b58}
   document.getElementById("offer").innerHTML = html;
   document.getElementById("kpNum").textContent = "КП № " + num + (client ? " · " + client : "");
   document.title = "КП " + num + (client ? " · " + client : "");
+  /* На вузьких екранах (телефон) масштабуємо аркуші А4 під ширину екрана, не змінюючи верстку */
+  const fit = () => { const pageW = 210 * 96 / 25.4; const k = Math.min(1, (window.innerWidth - 12) / pageW);
+    document.getElementById("offer").style.zoom = k; };
+  fit(); window.addEventListener("resize", fit); window.addEventListener("beforeprint", () => document.getElementById("offer").style.zoom = 1); window.addEventListener("afterprint", fit);
 })();
 </script>
 </body></html>
