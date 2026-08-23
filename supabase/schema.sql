@@ -283,13 +283,14 @@ drop function if exists public.kp_stats(timestamptz, timestamptz);
 create or replace function public.kp_stats(date_from timestamptz default null, date_to timestamptz default null)
 returns table (manager_id uuid, full_name text, filial text, kp_count bigint,
                sum_usd numeric, sum_uze_eur numeric, last_at timestamptz,
-               avg_usd numeric, avg_kwp numeric, sum_kwp numeric)
+               avg_usd numeric, avg_kwp numeric, sum_kwp numeric, bess_count bigint)
 language sql stable security definer set search_path = public as $$
   select pr.id, pr.full_name, pr.filial,
          count(k.id), coalesce(sum(k.total_price_usd),0), coalesce(sum(k.uze_total_eur),0), max(k.created_at),
          round(avg(k.total_price_usd) filter (where k.total_price_usd > 0)),      -- середній чек СЕС
          round(avg(k.installed_dc_kwp) filter (where k.installed_dc_kwp > 0), 1), -- середня потужність
-         coalesce(sum(k.installed_dc_kwp), 0)
+         coalesce(sum(k.installed_dc_kwp), 0),
+         count(k.id) filter (where coalesce(k.total_price_usd, 0) = 0)   -- КП без PV-частини (чисті BESS)
   from public.profiles pr
   left join public.kp_log k on k.manager_id = pr.id
        and (date_from is null or k.created_at >= date_from)

@@ -30,7 +30,7 @@ async function requireAuth(role) {
   if (!a.profile) {
     document.body.innerHTML = '<div class="wrap"><div class="alert warn">Для вашого акаунта ще не створено профіль. Зверніться до адміністратора.</div>' +
       '<p><a href="#" id="lo">Вийти</a></p></div>';
-    document.getElementById("lo").onclick = async e => { e.preventDefault(); await sb.auth.signOut(); location.replace("index.html"); };
+    document.getElementById("lo").onclick = async e => { e.preventDefault(); try { ["kp_html","kp_num","kp_client"].forEach(k => localStorage.removeItem(k)); } catch (x) {} await sb.auth.signOut(); location.replace("index.html"); };
     return null;
   }
   if (role === "admin" && a.profile.role !== "admin") { location.replace("calculator.html"); return null; }
@@ -51,7 +51,7 @@ function renderNav(profile) {
     <div class="who">${esc(profile.full_name || profile.email)} <span class="badge ${profile.role}">${ROLE_LABEL[profile.role]}</span>
       <a href="#" id="logoutBtn">Вийти</a></div></div>`;
   document.getElementById("logoutBtn").onclick = async e => {
-    e.preventDefault(); await sb.auth.signOut(); location.replace("index.html");
+    e.preventDefault(); try { ["kp_html","kp_num","kp_client"].forEach(k => localStorage.removeItem(k)); } catch (x) {} await sb.auth.signOut(); location.replace("index.html");
   };
 }
 

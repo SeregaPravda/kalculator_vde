@@ -2,12 +2,12 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Лічильник КП</title>
-<link rel="stylesheet" href="css/app.css?v=202608231321">
+<link rel="stylesheet" href="css/app.css?v=202608231328">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
  <div class="top"><div><h1>Лічильник КП</h1>
-  <div class="sub">КП фіксується в момент натискання «PDF / Друк пропозиції» в калькуляторі.</div></div></div>
+  <div class="sub">КП фіксується в момент натискання «Сформувати КП» в калькуляторі. Адміни в статистику по менеджерах не входять.</div></div></div>
  <div class="toolbar">
   <label class="f" style="margin:0">Період</label>
   <input type="date" id="from"> <span class="muted">—</span> <input type="date" id="to">
@@ -35,8 +35,8 @@
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202608231321"></script>
-<script src="js/auth.js?v=202608231321"></script>
+<script src="js/config.js?v=202608231328"></script>
+<script src="js/auth.js?v=202608231328"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
 const PLACE = { roof: "Дах", ground: "Земля" };
@@ -72,8 +72,11 @@ async function load() {
   const usd = rows.reduce((a, r) => a + Number(r.sum_usd), 0);
   const eur = rows.reduce((a, r) => a + Number(r.sum_uze_eur), 0);
   const kwp = rows.reduce((a, r) => a + Number(r.sum_kwp), 0);
-  const withPv = rows.filter(r => r.avg_usd != null);
-  const avgAll = withPv.length ? usd / withPv.reduce((a, r) => a + Number(r.kp_count), 0) : null;
+  /* середній чек по всіх КП з PV-частиною (без чистих BESS) */
+  const pvRows = rows.filter(r => r.avg_usd != null);
+  const pvSum = pvRows.reduce((a, r) => a + Number(r.sum_usd), 0);
+  const pvCnt = pvRows.reduce((a, r) => a + Number(r.kp_count) - Number(r.bess_count || 0), 0);
+  const avgAll = pvCnt > 0 ? pvSum / pvCnt : null;
   $("kpis").innerHTML = [[nf(total), "КП за період", "o"], [avgAll ? nf(avgAll) : "—", "Середній чек СЕС, $", "o"],
     [nf(usd), "Сума СЕС, $", ""], [nf(kwp), "Сума потужності, кВт", ""], [nf(eur), "Сума УЗЕ, €", ""],
     [nf(rows.filter(r => Number(r.kp_count) > 0).length) + " / " + nf(rows.length), "Активних менеджерів", ""]]
