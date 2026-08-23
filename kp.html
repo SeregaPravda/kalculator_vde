@@ -31,9 +31,8 @@ html,body{margin:0;background:#5f5b58}
 <div id="offer"></div>
 <script>
 (() => {
-  const html = sessionStorage.getItem("kp_html");
-  const num = sessionStorage.getItem("kp_num") || "";
-  const client = sessionStorage.getItem("kp_client") || "";
+  let html = null, num = "", client = "";
+  try { html = sessionStorage.getItem("kp_html"); num = sessionStorage.getItem("kp_num") || ""; client = sessionStorage.getItem("kp_client") || ""; } catch (e) {}
   if (!html) {
     document.getElementById("offer").innerHTML = '<div class="empty">Немає сформованого КП. Поверніться в калькулятор і натисніть «Сформувати КП».</div>';
     return;
