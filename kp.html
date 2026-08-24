@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Індикативна пропозиція</title>
-<link rel="stylesheet" href="css/app.css?v=202608231328">
+<link rel="stylesheet" href="css/app.css?v=202608250124">
 <style>
 /* Сторінка перегляду КП: показуємо тільки згенеровані аркуші + панель дій */
 html,body{margin:0;background:#5f5b58}
@@ -26,12 +26,14 @@ html,body{margin:0;background:#5f5b58}
 </style></head><body>
 <div class="bar">
   <span class="num" id="kpNum">КП</span>
-  <button class="btn" onclick="window.print()">Зберегти PDF / Друкувати</button>
+  <button class="btn" id="shareBtn">Поділитись PDF</button>
+  <button class="btn ghost" onclick="window.print()">Друк</button>
   <button class="btn ghost" onclick="window.close()">Закрити</button>
-  <p class="hint">У діалозі друку: <b>Принтер — «Зберегти як PDF»</b> · <b>Поля — «Немає»</b> · <b>Фонова графіка — увімкнено</b> · колонтитули — вимкнено.
-  Інакше браузер додасть свої поля, і кожен аркуш розірветься на два.</p>
+  <p class="hint" id="barHint">«Поділитись PDF» збирає файл прямо на пристрої: на телефоні відкриється меню «Поділитись» (Telegram, пошта, Viber…), на комп'ютері файл завантажиться.</p>
 </div>
 <div id="wrap"><div id="offer"></div></div>
+<script src="js/vendor/html2canvas.min.js"></script>
+<script src="js/vendor/jspdf.umd.min.js"></script>
 <script>
 (() => {
   let html = null, num = "", client = "";
@@ -50,6 +52,42 @@ html,body{margin:0;background:#5f5b58}
     else { off.style.width = ""; off.style.transform = ""; off.style.marginLeft = ""; wrap.style.height = ""; } };
   fit(); window.addEventListener("resize", fit); window.addEventListener("load", fit);
   window.addEventListener("beforeprint", () => { off.style.transform = ""; off.style.width = ""; off.style.marginLeft = ""; wrap.style.height = ""; }); window.addEventListener("afterprint", fit);
+
+  /* ---- «Поділитись PDF»: рендеримо кожен аркуш у canvas і збираємо PDF на пристрої ---- */
+  const btn = document.getElementById("shareBtn");
+  const safe = s => (s || "").replace(/[«»"'\\/:*?<>|]/g, "").trim().replace(/\s+/g, "_").slice(0, 40);
+  btn.onclick = async () => {
+    const old = btn.textContent;
+    btn.disabled = true;
+    try {
+      /* тимчасово знімаємо масштаб, щоб рендер ішов у повній роздільності */
+      const st = [off.style.transform, off.style.width, off.style.marginLeft, wrap.style.height];
+      off.style.transform = ""; off.style.width = ""; off.style.marginLeft = ""; wrap.style.height = "";
+      const pages = [...document.querySelectorAll("#offer .pg")];
+      const pdf = new jspdf.jsPDF({ unit: "mm", format: "a4", compress: true });
+      for (let i = 0; i < pages.length; i++) {
+        btn.textContent = "Сторінка " + (i + 1) + " з " + pages.length + "…";
+        const cv = await html2canvas(pages[i], { scale: 1.6, useCORS: true, backgroundColor: "#ffffff", logging: false });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(cv.toDataURL("image/jpeg", 0.87), "JPEG", 0, 0, 210, 297, undefined, "FAST");
+      }
+      [off.style.transform, off.style.width, off.style.marginLeft, wrap.style.height] = st;
+      const fname = "КП_" + safe(num) + (client ? "_" + safe(client) : "") + ".pdf";
+      const blob = pdf.output("blob");
+      const file = new File([blob], fname, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: fname }); }
+        catch (e) { if (e.name !== "AbortError") throw e; }   // користувач закрив меню — не помилка
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      }
+    } catch (e) {
+      alert("Не вдалося зібрати PDF: " + e.message + ". Скористайтесь кнопкою «Друк» → «Зберегти як PDF».");
+    }
+    btn.textContent = old; btn.disabled = false;
+  };
 })();
 </script>
 </body></html>
