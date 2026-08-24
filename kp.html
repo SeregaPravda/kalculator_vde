@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Індикативна пропозиція</title>
-<link rel="stylesheet" href="css/app.css?v=202608250124">
+<link rel="stylesheet" href="css/app.css?v=202608250129">
 <style>
 /* Сторінка перегляду КП: показуємо тільки згенеровані аркуші + панель дій */
 html,body{margin:0;background:#5f5b58}
@@ -75,10 +75,14 @@ html,body{margin:0;background:#5f5b58}
       const fname = "КП_" + safe(num) + (client ? "_" + safe(client) : "") + ".pdf";
       const blob = pdf.output("blob");
       const file = new File([blob], fname, { type: "application/pdf" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: fname }); }
-        catch (e) { if (e.name !== "AbortError") throw e; }   // користувач закрив меню — не помилка
-      } else {
+      /* меню «Поділитись» — тільки на телефонах/планшетах; на ПК одразу завантаження */
+      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+      let shared = false;
+      if (mobile && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: fname }); shared = true; }
+        catch (e) { if (e.name === "AbortError") shared = true; }   // користувач сам закрив меню
+      }
+      if (!shared) {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob); a.download = fname; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 30000);
