@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202608250129">
+<link rel="stylesheet" href="css/app.css?v=202608302117">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -70,6 +70,16 @@
  </div>
 </div>
 
+<div class="card"><h2>Клієнт</h2>
+ <div class="grid">
+  <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
+  <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
+  <div><label class="f">Номер КП</label><input id="mDoc" readonly value="" placeholder="присвоїться при формуванні" style="background:#F5F4F2;color:var(--muted)"></div>
+  <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
+ </div>
+ <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
+</div>
+
 <div class="hero"><div class="p" id="heroPrice">—</div><div class="s" id="heroSub">—</div></div>
 <div class="kpis" id="kpis"></div>
 <div style="height:16px"></div>
@@ -93,17 +103,6 @@
    <div class="disc" id="priceDisc"></div></div>
 </div>
 
-<div class="card"><h2>Дані для пропозиції</h2>
- <div class="grid">
-  <div><label class="f">Клієнт / об'єкт</label><input id="mClient" value="ТОВ «Назва»"></div>
-  <div><label class="f">Місто об'єкта</label><input id="mCity" value="м. Вінниця"></div>
-  <div><label class="f">Номер КП</label><input id="mDoc" readonly value="" placeholder="присвоїться при формуванні" style="background:#F5F4F2;color:var(--muted)"></div>
-  <div><label class="f">Строк дії, календарних днів</label><input type="number" id="mValid" value="7" min="1" step="1"></div>
- </div>
- <div class="hint" style="margin-top:12px">Менеджер у КП: <b id="mgrLine">…</b>. Контакти беруться з профілю — змінити їх може адміністратор.</div>
-</div>
-
-
 <div class="card"><h2>Мої останні КП</h2>
  <table id="histTbl"><thead><tr><th>Дата</th><th>Клієнт</th><th>№ КП</th><th>Тип</th><th class="num">кВт</th><th class="num">СЕС, $</th><th class="num">УЗЕ, €</th><th></th></tr></thead><tbody></tbody></table>
  <div class="hint" style="margin-top:8px">КП фіксується в момент натискання «Сформувати КП» і відкривається в новій вкладці для перегляду — звідти його зберігають у PDF або друкують. Номер РРРР-NNNN присвоюється автоматично. «Повторити» відновлює всі параметри того КП (новий друк отримає новий номер).</div>
@@ -117,11 +116,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202608250129"></script>
-<script src="js/auth.js?v=202608250129"></script>
-<script src="js/calc_engine.js?v=202608250129"></script>
-<script src="js/data.js?v=202608250129"></script>
-<script src="js/photo.js?v=202608250129"></script>
+<script src="js/config.js?v=202608302117"></script>
+<script src="js/auth.js?v=202608302117"></script>
+<script src="js/calc_engine.js?v=202608302117"></script>
+<script src="js/data.js?v=202608302117"></script>
+<script src="js/photo.js?v=202608302117"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };

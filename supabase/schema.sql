@@ -280,21 +280,36 @@ grant execute on function public.calculate_quote(jsonb, boolean) to authenticate
 
 -- ---------------------------------------------------- ДАШБОРД: зведення по менеджерах
 drop function if exists public.kp_stats(timestamptz, timestamptz);
+-- Статистика по менеджерах. Рахується ПО ОСТАННЬОМУ КП на кожного клієнта
+-- (повторні прорахунки того самого клієнта не псують суми й середній чек);
+-- calc_count — скільки всього прорахунків зробив менеджер за період.
 create or replace function public.kp_stats(date_from timestamptz default null, date_to timestamptz default null)
 returns table (manager_id uuid, full_name text, filial text, kp_count bigint,
                sum_usd numeric, sum_uze_eur numeric, last_at timestamptz,
-               avg_usd numeric, avg_kwp numeric, sum_kwp numeric, bess_count bigint)
+               avg_usd numeric, avg_kwp numeric, sum_kwp numeric, bess_count bigint, calc_count bigint)
 language sql stable security definer set search_path = public as $$
+  with lastkp as (
+    select distinct on (k.manager_id, lower(trim(coalesce(nullif(k.client_name, ''), '~' || k.id::text)))) k.*
+    from public.kp_log k
+    where (date_from is null or k.created_at >= date_from)
+      and (date_to   is null or k.created_at <  date_to)
+    order by k.manager_id, lower(trim(coalesce(nullif(k.client_name, ''), '~' || k.id::text))), k.created_at desc
+  ), allk as (
+    select k.manager_id as mid, count(*) as c from public.kp_log k
+    where (date_from is null or k.created_at >= date_from)
+      and (date_to   is null or k.created_at <  date_to)
+    group by k.manager_id
+  )
   select pr.id, pr.full_name, pr.filial,
          count(k.id), coalesce(sum(k.total_price_usd),0), coalesce(sum(k.uze_total_eur),0), max(k.created_at),
-         round(avg(k.total_price_usd) filter (where k.total_price_usd > 0)),      -- середній чек СЕС
-         round(avg(k.installed_dc_kwp) filter (where k.installed_dc_kwp > 0), 1), -- середня потужність
+         round(avg(k.total_price_usd) filter (where k.total_price_usd > 0)),
+         round(avg(k.installed_dc_kwp) filter (where k.installed_dc_kwp > 0), 1),
          coalesce(sum(k.installed_dc_kwp), 0),
-         count(k.id) filter (where coalesce(k.total_price_usd, 0) = 0)   -- КП без PV-частини (чисті BESS)
+         count(k.id) filter (where coalesce(k.total_price_usd, 0) = 0),
+         coalesce(max(a.c), 0)
   from public.profiles pr
-  left join public.kp_log k on k.manager_id = pr.id
-       and (date_from is null or k.created_at >= date_from)
-       and (date_to   is null or k.created_at <  date_to)
+  left join lastkp k on k.manager_id = pr.id
+  left join allk a on a.mid = pr.id
   where public.is_admin() and pr.role = 'manager'
   group by pr.id, pr.full_name, pr.filial
   order by count(k.id) desc, pr.full_name
