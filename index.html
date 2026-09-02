@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Вхід</title>
-<link rel="stylesheet" href="css/app.css?v=202609021021">
+<link rel="stylesheet" href="css/app.css?v=202609021046">
 </head><body>
 <div class="login">
   <div class="logo" style="margin-bottom:14px">Група «<span>ПРОМАВТОМАТИКА</span>»</div>
@@ -14,24 +14,16 @@
     <div class="err" id="err"></div>
     <button class="btn" id="btn" type="submit">Увійти</button>
   </form>
-  <div class="hint" style="margin-top:16px"><a href="#" id="forgot" style="color:var(--o)">Забули пароль?</a> · Немає доступу? Акаунти створює адміністратор.</div>
+  <div class="hint" style="margin-top:16px">Немає доступу або забули пароль? Зверніться до адміністратора.</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609021021"></script>
-<script src="js/auth.js?v=202609021021"></script>
+<script src="js/config.js?v=202609021046"></script>
+<script src="js/auth.js?v=202609021046"></script>
 <script>
 (async () => {
   if (!configured()) { document.getElementById("err").textContent = "Сайт не налаштовано: заповніть js/config.js."; return; }
   const a = await getSessionProfile();
   if (a) { location.replace("calculator.html"); return; }
-  document.getElementById("forgot").addEventListener("click", async e => {
-    e.preventDefault();
-    const err = document.getElementById("err"), email = document.getElementById("email").value.trim();
-    if (!email) { err.textContent = "Введіть пошту в полі вище і натисніть «Забули пароль?» ще раз."; return; }
-    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "reset.html" });
-    err.style.color = error ? "" : "#2F6B33";
-    err.textContent = error ? error.message : "Лист із посиланням для зміни пароля надіслано на " + email + ". Перевірте пошту (і папку «Спам»).";
-  });
   document.getElementById("f").addEventListener("submit", async e => {
     e.preventDefault();
     const btn = document.getElementById("btn"), err = document.getElementById("err");
