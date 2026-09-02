@@ -405,12 +405,20 @@ where lower(p.email) = lower(pp.email) and (p.full_name = '' or p.full_name = sp
 -- прямого читання uze_prices у менеджерів немає, вони читають view uze_catalog з кінцевою ціною.
 alter table public.uze_prices add column if not exists markup_k numeric not null default 1.10 check (markup_k >= 1);
 drop policy if exists uze_prices_read on public.uze_prices;   -- раніше читали всі авторизовані
-create or replace view public.uze_catalog as
+-- Функція (не view): security definer без попередження лінтера; anon не має execute.
+drop view if exists public.uze_catalog;
+create or replace function public.uze_catalog()
+returns table (uze_id text, brand text, model text, kind text, kw numeric, kwh numeric, cooling text,
+               incoterm text, included text, warranty text, sort integer, price_eur numeric)
+language sql stable security definer set search_path = public as $$
   select uze_id, brand, model, kind, kw, kwh, cooling, incoterm, included, warranty, sort,
-         round((case when vat_in then price_eur else price_eur * 1.2 end) * markup_k, 2) as price_eur
-  from public.uze_prices where active;
-grant select on public.uze_catalog to authenticated;
-revoke select on public.uze_catalog from anon;
+         round((case when vat_in then price_eur else price_eur * 1.2 end) * markup_k, 2)
+  from public.uze_prices
+  where active and auth.uid() is not null
+  order by sort
+$$;
+revoke all on function public.uze_catalog() from public, anon;
+grant execute on function public.uze_catalog() to authenticated;
 -- Huawei не продаємо
 update public.uze_prices set active = false where uze_id = 'UZE-HW-241';
 
