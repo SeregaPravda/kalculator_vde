@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609021113">
+<link rel="stylesheet" href="css/app.css?v=202609021115">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -113,11 +113,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609021113"></script>
-<script src="js/auth.js?v=202609021113"></script>
-<script src="js/calc_engine.js?v=202609021113"></script>
-<script src="js/data.js?v=202609021113"></script>
-<script src="js/photo.js?v=202609021113"></script>
+<script src="js/config.js?v=202609021115"></script>
+<script src="js/auth.js?v=202609021115"></script>
+<script src="js/calc_engine.js?v=202609021115"></script>
+<script src="js/data.js?v=202609021115"></script>
+<script src="js/photo.js?v=202609021115"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -173,7 +173,7 @@ function restoreState(st) {
   fillModels(st.v.fInvModel); fillPanels(Number(st.v.fPanel)); fillUze();
   FORM_IDS.forEach(id => { if (st.v[id] != null) $(id).value = st.v[id]; });
   if ($("fUzeKind").value !== st.v.fUzeKind) { $("fUzeKind").value = st.v.fUzeKind; fillUze(); $("fUze").value = st.v.fUze; }
-  manualInv = !!st.manualInv; manualPanel = !!st.manualPanel;
+  manualInv = !!st.manualInv; manualPanel = !!st.manualPanel; manualUze = true;
   $("mDoc").value = "";
   run();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -203,7 +203,18 @@ function fillUze() {
   const cur = $("fUze").value;
   $("fUze").innerHTML = list.map(u =>
     `<option value="${u.id}">${u.brand} ${u.model} · ${u.kw} кВт / ${u.kwh} кВт·год</option>`).join("");
-  if (list.some(u => u.id === cur)) $("fUze").value = cur;
+  if (manualUze && list.some(u => u.id === cur)) $("fUze").value = cur; else autoPickUze(list);
+}
+/* Поки менеджер не обрав модель сам — беремо найменшу шафу, ємність якої ≥ цільової
+   (261 → KSTAR 260, а не 2 × 240). Якщо жодна не дотягує — найбільшу. */
+let manualUze = false;
+function autoPickUze(list) {
+  list = list || D.uze.filter(u => u.kind === $("fUzeKind").value);
+  if (!list.length) return;
+  const target = Number($("fUzeKwh").value) || 0;
+  const fit = list.filter(u => u.kwh >= target - 0.5).sort((a, b) => a.kwh - b.kwh)[0]
+           || list.slice().sort((a, b) => b.kwh - a.kwh)[0];
+  $("fUze").value = fit.id;
 }
 const curUze = () => D.uze.find(u => u.id === $("fUze").value) || D.uze[0];
 const toggleAdv = () => { const b = $("advBox"); b.style.display = b.style.display === "none" ? "block" : "none"; };
@@ -807,9 +818,10 @@ async function loadHistory() {
 ["fDc", "fUnit"].forEach(id => $(id).addEventListener("input", () => { manualInv = false; autoAc(); }));
 $("fAc").addEventListener("input", () => { manualInv = false; run(); });
 $("fPanel").addEventListener("change", () => { manualPanel = true; run(); });
-$("fUzeKind").addEventListener("change", () => { fillUze(); run(); });
-$("fUze").addEventListener("change", run);
-["fTariff", "fEff", "fExport", "fTilt", "fAz", "fFx", "fMode", "fBatKwh", "fBackup", "fYears", "fUzeKwh", "fFxEur"]
+$("fUzeKind").addEventListener("change", () => { manualUze = false; fillUze(); run(); });
+$("fUze").addEventListener("change", () => { manualUze = true; run(); });
+$("fUzeKwh").addEventListener("input", () => { if (!manualUze) autoPickUze(); run(); });
+["fTariff", "fEff", "fExport", "fTilt", "fAz", "fFx", "fMode", "fBatKwh", "fBackup", "fYears", "fFxEur"]
   .forEach(id => $(id).addEventListener("input", run));
 ["fInvModel", "fInvKw", "fInvQty"].forEach(id => $(id).addEventListener("input", () => {
   manualInv = true;
