@@ -46,7 +46,7 @@ function renderNav(profile) {
   if (profile.role === "admin")
     links.push(["admin-prices.html", "Ціни"], ["admin-dashboard.html", "Лічильник КП"], ["admin-users.html", "Користувачі"]);
   el.innerHTML = `<div class="nav">
-    <div class="logo">Група компаній «<span>ПРОМАВТОМАТИКА</span>»</div>
+    <div class="logo">Група «<span>ПРОМАВТОМАТИКА</span>»</div>
     <div class="links">${links.map(l => `<a href="${l[0]}" class="${page === l[0] ? "on" : ""}">${l[1]}</a>`).join("")}</div>
     <div class="who">${esc(profile.full_name || profile.email)} <span class="badge ${profile.role}">${ROLE_LABEL[profile.role]}</span>
       <a href="#" id="logoutBtn">Вийти</a></div></div>`;

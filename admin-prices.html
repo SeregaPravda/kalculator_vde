@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Ціни</title>
-<link rel="stylesheet" href="css/app.css?v=202608302117">
+<link rel="stylesheet" href="css/app.css?v=202609021010">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -23,16 +23,16 @@
   </div>
  </div>
  <div class="card"><h2>Системи накопичення (УЗЕ), € за шафу</h2>
-  <div class="muted" style="margin-bottom:8px">Ціни відкриті для менеджерів. «Ціна» — як надав постачальник; якщо ПДВ не включено, у КП додається 20 %. Неактивні моделі зникають зі списку в калькуляторі.</div>
-  <div style="overflow-x:auto"><table class="edit" id="uzeTbl"><thead><tr><th>Модель</th><th class="num">кВт / кВт·год</th><th class="num">Ціна, €</th><th>ПДВ</th><th>Умови постачання</th><th>Гарантія</th><th>Джерело ціни</th><th class="num">З ПДВ, €</th><th class="num">€/кВт·год</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
+  <div class="muted" style="margin-bottom:8px">«Ціна постачальника» — як у рахунку; якщо ПДВ не включено, додається 20 %. «Націнка» — коефіцієнт комерційної функції (1,10 = +10 %). Менеджери бачать лише «Ціну для КП» — ні закупівельну ціну, ні націнку. Неактивні моделі зникають зі списку в калькуляторі.</div>
+  <div style="overflow-x:auto"><table class="edit" id="uzeTbl"><thead><tr><th>Модель</th><th class="num">кВт / кВт·год</th><th class="num">Ціна постачальника, €</th><th>ПДВ</th><th class="num">Націнка, ×</th><th>Умови постачання</th><th>Гарантія</th><th>Джерело ціни</th><th class="num">Ціна для КП, €</th><th class="num">€/кВт·год</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
  </div>
  <div class="card"><h2>Перевірка</h2>
   <div class="muted">Приклад: мережева, дах, 120 кВт → сегмент large → 120 × <span id="chk">…</span> $</div>
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202608302117"></script>
-<script src="js/auth.js?v=202608302117"></script>
+<script src="js/config.js?v=202609021010"></script>
+<script src="js/auth.js?v=202609021010"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна" }, PLACE = { roof: "Дах", ground: "Земля" },
       SEG = { small: "до 30", medium: "30–100", large: "від 100" };
@@ -42,15 +42,17 @@ let PV = [], BAT = [], UZE = [], ME = null;
 function renderUze() {
   document.querySelector("#uzeTbl tbody").innerHTML = UZE.map(u => {
     const withVat = u.vat_in ? Number(u.price_eur) : Number(u.price_eur) * 1.2;
+    const final = withVat * Number(u.markup_k || 1);
     return `<tr data-uze="${esc(u.uze_id)}">
     <td><b>${esc(u.brand)}</b><br><span class="muted">${esc(u.model)}</span></td>
     <td class="num muted">${nf(u.kw)} / ${nf(u.kwh, 1)}</td>
     <td class="num"><input type="number" step="0.01" min="0" data-f="price_eur" value="${u.price_eur}"></td>
     <td><select data-f="vat_in"><option value="false" ${!u.vat_in ? "selected" : ""}>без ПДВ</option><option value="true" ${u.vat_in ? "selected" : ""}>з ПДВ</option></select></td>
+    <td class="num"><input type="number" step="0.01" min="1" data-f="markup_k" value="${u.markup_k || 1}"></td>
     <td><input data-f="incoterm" value="${esc(u.incoterm || "")}"></td>
     <td><input data-f="warranty" value="${esc(u.warranty || "")}"></td>
     <td><input data-f="source" value="${esc(u.source || "")}" placeholder="рахунок, дата"></td>
-    <td class="num">${nf(withVat)}</td><td class="num">${nf(withVat / Number(u.kwh), 1)}</td>
+    <td class="num"><b>${nf(final)}</b></td><td class="num">${nf(final / Number(u.kwh), 1)}</td>
     <td><input type="checkbox" data-f="active" ${u.active ? "checked" : ""} style="width:auto"></td></tr>`; }).join("");
 }
 
@@ -95,12 +97,13 @@ async function save() {
     const row = UZE.find(r => r.uze_id === tr.dataset.uze), upd = {};
     tr.querySelectorAll("[data-f]").forEach(el => {
       const f = el.dataset.f;
-      const v = f === "active" ? el.checked : f === "vat_in" ? el.value === "true" : f === "price_eur" ? Number(el.value) : el.value;
-      const cur = f === "price_eur" ? Number(row[f]) : (row[f] == null ? "" : row[f]);
+      const v = f === "active" ? el.checked : f === "vat_in" ? el.value === "true" : (f === "price_eur" || f === "markup_k") ? Number(el.value) : el.value;
+      const cur = (f === "price_eur" || f === "markup_k") ? Number(row[f]) : (row[f] == null ? "" : row[f]);
       if (v !== cur) upd[f] = v;
     });
     if (!Object.keys(upd).length) continue;
     if ("price_eur" in upd && !(upd.price_eur > 0)) { errs.push("Ціна УЗЕ має бути > 0"); continue; }
+    if ("markup_k" in upd && !(upd.markup_k >= 1)) { errs.push("Націнка має бути ≥ 1,00"); continue; }
     upd.updated_at = now; upd.updated_by = ME.id;
     const { error } = await sb.from("uze_prices").update(upd).eq("uze_id", row.uze_id);
     if (error) errs.push(error.message);

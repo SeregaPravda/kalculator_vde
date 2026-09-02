@@ -399,3 +399,32 @@ update public.profiles set role = 'admin', position = 'Комерційна фу
 update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial
 from public.pending_profiles pp
 where lower(p.email) = lower(pp.email) and (p.full_name = '' or p.full_name = split_part(p.email, '@', 1));
+
+-- ------------------------------------------------ НАЦІНКА УЗЕ (30.08.2026)
+-- Коефіцієнт комерційної функції зберігається в uze_prices.markup_k і менеджерам не видимий:
+-- прямого читання uze_prices у менеджерів немає, вони читають view uze_catalog з кінцевою ціною.
+alter table public.uze_prices add column if not exists markup_k numeric not null default 1.10 check (markup_k >= 1);
+drop policy if exists uze_prices_read on public.uze_prices;   -- раніше читали всі авторизовані
+create or replace view public.uze_catalog as
+  select uze_id, brand, model, kind, kw, kwh, cooling, incoterm, included, warranty, sort,
+         round((case when vat_in then price_eur else price_eur * 1.2 end) * markup_k, 2) as price_eur
+  from public.uze_prices where active;
+grant select on public.uze_catalog to authenticated;
+revoke select on public.uze_catalog from anon;
+-- Huawei не продаємо
+update public.uze_prices set active = false where uze_id = 'UZE-HW-241';
+
+-- ------------------------------------------------ ПРОФІЛІ: корпоративні номери (30.08.2026)
+insert into public.pending_profiles (email, full_name, phone, filial, position) values
+  ('valerii.prydryk@pa.ua',       'Придрик Валерій',       '+380674977181', 'Хмельницький', 'Менеджер з прямих продажів (універсальний)'),
+  ('andrii.kichura@pa.ua',        'Кічура Андрій',         '+380632600632', 'Львів',        'Менеджер з прямих продажів (універсальний)'),
+  ('yurii.dublianko@pa.ua',       'Дублянко Юрій',         '+380635832721', 'Львів',        'Менеджер з прямих продажів'),
+  ('mykhailo.martyniuk@pa.ua',    'Мартинюк Михайло',      '+380631897096', 'Хмельницький', 'Менеджер з прямих продажів'),
+  ('mariia.olesenko@pa.ua',       'Олесенко Марія',        '+380632600639', 'Київ',         'Менеджер з прямих продажів'),
+  ('mykola.maksymenko@pa.ua',     'Максименко Микола',     '+380632600568', 'Вінниця',      'Менеджер з прямих продажів'),
+  ('kostiantyn.podolynnyi@pa.ua', 'Подолинний Костянтин',  '+380674770922', 'Вінниця',      'Менеджер з прямих продажів'),
+  ('dmytro.osadchuk@pa.ua',       'Осадчук Дмитро',        '+380674950867', 'Вінниця',      'Менеджер з прямих продажів'),
+  ('oleksandr.velhus@pa.ua',      'Вельгус Олександр',     '+380674308108', 'Вінниця',      'Менеджер з прямих продажів')
+on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial, position = excluded.position;
+update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial, position = pp.position
+from public.pending_profiles pp where lower(p.email) = lower(pp.email) and p.role = 'manager';

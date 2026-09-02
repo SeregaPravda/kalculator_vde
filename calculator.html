@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202608302117">
+<link rel="stylesheet" href="css/app.css?v=202609021010">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -58,9 +58,6 @@
     <div class="pvonly"><label class="f">Азимут, ° (0 = південь)</label><input type="number" id="fAz" value="0" step="1"></div>
     <div class="pvonly"><label class="f">Курс, грн/$</label><input type="number" id="fFx" value="44.80" step="0.01"></div>
     <div class="uzeonly hide"><label class="f">Курс, грн/€</label><input type="number" id="fFxEur" value="48.50" step="0.01"></div>
-    <div class="uzeonly hide"><label class="f">Коефіцієнт до ціни постачальника УЗЕ</label>
-      <input type="number" id="fUzeK" value="1.00" min="1" step="0.01">
-      <div class="hint">1,00 = ціна постачальника без націнки. Для позицій FCA логістика й розмитнення не включені.</div></div>
     <div class="pvonly"><label class="f">Горизонт окупності, років</label><input type="number" id="fYears" value="10" min="3" max="25" step="1"></div>
     <div class="pvonly"><label class="f">Режим профілю</label><select id="fMode">
       <option value="hourly">Погодинний (з оцінкою кліпінгу)</option>
@@ -116,11 +113,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202608302117"></script>
-<script src="js/auth.js?v=202608302117"></script>
-<script src="js/calc_engine.js?v=202608302117"></script>
-<script src="js/data.js?v=202608302117"></script>
-<script src="js/photo.js?v=202608302117"></script>
+<script src="js/config.js?v=202609021010"></script>
+<script src="js/auth.js?v=202609021010"></script>
+<script src="js/calc_engine.js?v=202609021010"></script>
+<script src="js/data.js?v=202609021010"></script>
+<script src="js/photo.js?v=202609021010"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -142,14 +139,15 @@ const CLIENT_LOGOS = [["greco","GRECO group"],["kernel","Kernel"],["lustdorf","�
                       ["interjuice","Interjuice"],["tom","ТОМ"],["khlibprom","Концерн Хлібпром"],["gadz","GADZ"],["ekosfera","Екосфера"],["grain_alliance","Grain Alliance"]];
 let manualInv = false;
 
-/* Ціни УЗЕ завантажуються з Supabase (uze_prices) і приводяться до формату D.uze */
+/* Ціни УЗЕ: view uze_catalog віддає вже КІНЦЕВУ ціну (з ПДВ і націнкою комерційної функції).
+   Саму націнку менеджер не бачить — вона є лише в таблиці uze_prices для адміна. */
 async function loadUzePrices() {
-  const { data, error } = await sb.from("uze_prices").select("*").eq("active", true).order("sort");
+  const { data, error } = await sb.from("uze_catalog").select("*").order("sort");
   if (error || !data || !data.length) { D.uze = []; return "Не вдалося завантажити ціни УЗЕ" + (error ? ": " + error.message : ""); }
   D.uze = data.map(u => {
-    const withVat = u.vat_in ? Number(u.price_eur) : +(Number(u.price_eur) * 1.2).toFixed(2);
+    const withVat = Number(u.price_eur);
     return { id: u.uze_id, brand: u.brand, model: u.model, kind: u.kind, kw: Number(u.kw), kwh: Number(u.kwh),
-             cooling: u.cooling, priceEur: Number(u.price_eur), vatIn: u.vat_in ? "Так" : "Ні", incoterm: u.incoterm,
+             cooling: u.cooling, priceEur: withVat, fca: /^(FCA|EXW|FOB)/i.test(u.incoterm || ""), incoterm: u.incoterm,
              included: u.included, warranty: u.warranty, source: u.source,
              withVatEur: withVat, eurPerKwh: +(withVat / Number(u.kwh)).toFixed(1) };
   });
@@ -158,7 +156,7 @@ async function loadUzePrices() {
 
 /* ---- стан форми: серіалізація для повтору КП з історії ---- */
 const FORM_IDS = ["fDc","fUnit","fAc","fBatKwh","fPanel","fTariff","fUzeKind","fUze","fUzeKwh","fInvModel","fInvKw","fInvQty",
-                  "mVideo","fBackup","fEff","fExport","fTilt","fAz","fFx","fFxEur","fUzeK","fYears","fMode","mClient","mCity","mValid"];
+                  "mVideo","fBackup","fEff","fExport","fTilt","fAz","fFx","fFxEur","fYears","fMode","mClient","mCity","mValid"];
 function formState() {
   const o = { S: { ...S }, manualInv, manualPanel, v: {} };
   FORM_IDS.forEach(id => o.v[id] = $(id).value);
@@ -337,10 +335,9 @@ function run() {
     const u = curUze();
     const targetKwh = Number($("fUzeKwh").value) || 0;
     const qty = u && u.kwh && targetKwh > 0 ? Math.ceil(targetKwh / u.kwh) : 0;
-    const k = Number($("fUzeK").value) || 1;
     const fxEur = Number($("fFxEur").value) || 48.5;
-    const totalEur = +(qty * u.withVatEur * k).toFixed(2);
-    UZ = { ...u, qty, k, fxEur,
+    const totalEur = +(qty * u.withVatEur).toFixed(2);
+    UZ = { ...u, qty, fxEur,
            totalKwh: +(qty * u.kwh).toFixed(2), totalKw: qty * u.kw,
            totalEur, totalUah: Math.round(totalEur * fxEur) };
     $("uzeHint").textContent = qty
@@ -406,16 +403,12 @@ function render() {
   const W = R.warnings.slice();
   if (CFG.UZ) {
     if (!CFG.UZ.qty) W.unshift("Вкажіть цільову ємність УЗЕ, щоб порахувати вартість.");
-    if (CFG.UZ.vatIn === "Ні")
-      W.push("Ціна " + CFG.UZ.brand + " надана на умовах " + CFG.UZ.incoterm +
-        " без ПДВ. У розрахунку ПДВ додано, але логістика в Україну та митні платежі НЕ включені — " +
-        "фактична вартість на об'єкті буде вищою.");
+    if (CFG.UZ.fca)
+      W.push("Ціна " + CFG.UZ.brand + " — на умовах " + CFG.UZ.incoterm +
+        ": логістика в Україну та митні платежі НЕ включені — фактична вартість на об'єкті буде вищою.");
     if (CFG.UZ.incoterm === "уточнити")
       W.push("Умови постачання для " + CFG.UZ.brand + " не підтверджені. " +
         "Незрозуміло, чи входить логістика в ціну.");
-    if (CFG.UZ.k === 1)
-      W.push("Коефіцієнт до ціни постачальника = 1,00. Це закупівельна вартість без націнки, " +
-        "монтажу та пусконалагодження. Для клієнтського КП коефіцієнт має задати комерційна функція.");
   }
   if (CFG.BAT) {
     if (CFG.BAT.totalKwh > 0 && CFG.BAT.backupPowerKw < CFG.BAT.targetBackupKw * 0.98)
@@ -475,8 +468,7 @@ function render() {
   } else if (S.type !== "bess") eco.push(["Вартість СЕС", pend ? "…" : "—"]);
   if (CFG.UZ && CFG.UZ.qty) eco.push(
     ["Вартість УЗЕ", nf(CFG.UZ.totalEur) + " €"],
-    ["у гривні", nf(CFG.uzeUah) + " грн"], ["Курс", nf(CFG.UZ.fxEur, 2) + " грн/€"],
-    ["Коефіцієнт до ціни постачальника", nf(CFG.UZ.k, 2)]);
+    ["у гривні", nf(CFG.uzeUah) + " грн"], ["Курс", nf(CFG.UZ.fxEur, 2) + " грн/€"]);
   if (PR && CFG.UZ && CFG.UZ.qty) eco.push(["РАЗОМ, грн", nf(CFG.totalUah)]);
   if (S.type !== "bess") eco.push(["Тариф", nf(CFG.tariff, 2) + " грн/кВт·год"],
     ["Річна економія", nf(CFG.save) + " грн"],
@@ -551,7 +543,7 @@ function hookTips(el, unit) {
 
 /* --------------------------------------------------------- пропозиція */
 const PRICE_DISC = PRICE_DISCLAIMER;
-const CO = { name: "Група компаній «Промавтоматика»",
+const CO = { name: "Група «Промавтоматика»",
   addr: "м. Вінниця, 21021, вул. Хмельницьке шосе, 145",
   phones: "+38 (0432) 56-12-20 · +38 (067) 433 43 33",
   hours: "Пн–Пт 8:00–19:00 · Сб 9:00–14:00", site: "pa.ua",
@@ -621,7 +613,7 @@ function buildOffer() {
 
   $("offer").innerHTML = `
 <div class="pg cov">
- <div class="lgrow"><span class="lg1">Група компаній</span><span class="lg2">ПРОМАВТОМАТИКА</span></div>
+ <div class="lgrow"><span class="lg1">Група</span><span class="lg2">ПРОМАВТОМАТИКА</span></div>
  <div class="bighead">ВІДНОВЛЮВАЛЬНІ ДЖЕРЕЛА<br>ЕЛЕКТРОЕНЕРГІЇ</div>
  <div class="covsub">Сонячні електростанції та системи накопичення енергії</div>
  <div class="photoband" style="${PHOTO ? `background-image:url('${PHOTO}')` : ""}"></div>
@@ -737,7 +729,7 @@ ${bessOnly ? "" : `<div class="pg">
 <div class="pg combo">
  <div class="topsec">
   <h2>Реалізовані проєкти</h2><div class="rule"></div>
-  <p class="lead" style="margin-bottom:0">Промислові сонячні електростанції, побудовані групою компаній «Промавтоматика».</p>
+  <p class="lead" style="margin-bottom:0">Промислові сонячні електростанції, побудовані групою «Промавтоматика».</p>
   <div class="projects">${PROJECTS.map(p =>
     `<div class="pcard"><div class="pph"${p[2] ? ` style="background-image:url(img/projects/${p[2]})"` : ""}></div><div class="t">${p[0]}</div><div class="p">${p[1] || "&nbsp;"}</div></div>`).join("")}</div>
  </div>
@@ -817,7 +809,7 @@ $("fAc").addEventListener("input", () => { manualInv = false; run(); });
 $("fPanel").addEventListener("change", () => { manualPanel = true; run(); });
 $("fUzeKind").addEventListener("change", () => { fillUze(); run(); });
 $("fUze").addEventListener("change", run);
-["fTariff", "fEff", "fExport", "fTilt", "fAz", "fFx", "fMode", "fBatKwh", "fBackup", "fYears", "fUzeKwh", "fUzeK", "fFxEur"]
+["fTariff", "fEff", "fExport", "fTilt", "fAz", "fFx", "fMode", "fBatKwh", "fBackup", "fYears", "fUzeKwh", "fFxEur"]
   .forEach(id => $(id).addEventListener("input", run));
 ["fInvModel", "fInvKw", "fInvQty"].forEach(id => $(id).addEventListener("input", () => {
   manualInv = true;
