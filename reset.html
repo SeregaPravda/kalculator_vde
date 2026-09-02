@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Промавтоматика · Пароль</title>
+<link rel="stylesheet" href="css/app.css?v=202609021021">
+</head><body>
+<div class="login">
+  <div class="logo" style="margin-bottom:14px">Група «<span>ПРОМАВТОМАТИКА</span>»</div>
+  <h1>Новий пароль</h1>
+  <div class="sub" id="who">…</div>
+  <form id="f" hidden>
+    <div class="f"><label class="f">Новий пароль (мінімум 8 символів)</label><input id="p1" type="password" autocomplete="new-password" required minlength="8"></div>
+    <div class="f"><label class="f">Повторіть пароль</label><input id="p2" type="password" autocomplete="new-password" required minlength="8"></div>
+    <div class="err" id="err"></div>
+    <button class="btn" id="btn" type="submit">Зберегти пароль</button>
+  </form>
+  <div id="msg" class="hint" style="margin-top:14px"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js?v=202609021021"></script>
+<script src="js/auth.js?v=202609021021"></script>
+<script>
+(async () => {
+  const $ = i => document.getElementById(i);
+  /* Сюди потрапляють двома шляхами: з листа відновлення (Supabase сам створює сесію з #access_token)
+     або з меню «Змінити пароль» уже залогінений користувач. В обох випадках потрібна активна сесія. */
+  let { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    await new Promise(r => setTimeout(r, 1200));     // supabase-js ще може обробляти токен з URL
+    session = (await sb.auth.getSession()).data.session;
+  }
+  if (!session) {
+    $("who").textContent = "Посилання недійсне або прострочене.";
+    $("msg").innerHTML = 'Поверніться на <a href="index.html">сторінку входу</a> і натисніть «Забули пароль?» ще раз.';
+    return;
+  }
+  $("who").textContent = session.user.email;
+  $("f").hidden = false;
+  $("f").addEventListener("submit", async e => {
+    e.preventDefault();
+    const p1 = $("p1").value, p2 = $("p2").value, err = $("err");
+    err.textContent = "";
+    if (p1.length < 8) { err.textContent = "Мінімум 8 символів."; return; }
+    if (p1 !== p2) { err.textContent = "Паролі не збігаються."; return; }
+    $("btn").disabled = true;
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if (error) { err.textContent = error.message; $("btn").disabled = false; return; }
+    $("f").hidden = true;
+    $("msg").innerHTML = 'Пароль змінено. <a href="calculator.html">Перейти до калькулятора</a>.';
+    history.replaceState(null, "", "reset.html");
+  });
+})();
+</script>
+</body></html>

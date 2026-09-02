@@ -49,6 +49,7 @@ function renderNav(profile) {
     <div class="logo">Група «<span>ПРОМАВТОМАТИКА</span>»</div>
     <div class="links">${links.map(l => `<a href="${l[0]}" class="${page === l[0] ? "on" : ""}">${l[1]}</a>`).join("")}</div>
     <div class="who">${esc(profile.full_name || profile.email)} <span class="badge ${profile.role}">${ROLE_LABEL[profile.role]}</span>
+      <a href="reset.html" style="color:var(--muted);margin-left:8px">Змінити пароль</a>
       <a href="#" id="logoutBtn">Вийти</a></div></div>`;
   document.getElementById("logoutBtn").onclick = async e => {
     e.preventDefault(); try { ["kp_html","kp_num","kp_client"].forEach(k => localStorage.removeItem(k)); } catch (x) {} await sb.auth.signOut(); location.replace("index.html");
