@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609021115">
+<link rel="stylesheet" href="css/app.css?v=202609021119">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -113,11 +113,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609021115"></script>
-<script src="js/auth.js?v=202609021115"></script>
-<script src="js/calc_engine.js?v=202609021115"></script>
-<script src="js/data.js?v=202609021115"></script>
-<script src="js/photo.js?v=202609021115"></script>
+<script src="js/config.js?v=202609021119"></script>
+<script src="js/auth.js?v=202609021119"></script>
+<script src="js/calc_engine.js?v=202609021119"></script>
+<script src="js/data.js?v=202609021119"></script>
+<script src="js/photo.js?v=202609021119"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -148,7 +148,7 @@ async function loadUzePrices() {
     const withVat = Number(u.price_eur);
     return { id: u.uze_id, brand: u.brand, model: u.model, kind: u.kind, kw: Number(u.kw), kwh: Number(u.kwh),
              cooling: u.cooling, priceEur: withVat, fca: /^(FCA|EXW|FOB)/i.test(u.incoterm || ""), incoterm: u.incoterm,
-             included: u.included, warranty: u.warranty, source: u.source,
+             included: u.included, warranty: u.warranty, source: u.source, sort: u.sort,
              withVatEur: withVat, eurPerKwh: +(withVat / Number(u.kwh)).toFixed(1) };
   });
   return null;
@@ -212,7 +212,9 @@ function autoPickUze(list) {
   list = list || D.uze.filter(u => u.kind === $("fUzeKind").value);
   if (!list.length) return;
   const target = Number($("fUzeKwh").value) || 0;
-  const fit = list.filter(u => u.kwh >= target - 0.5).sort((a, b) => a.kwh - b.kwh)[0]
+  /* при різниці ємності < 1 кВт·год — за порядком у прайсі (основний постачальник перший) */
+  const byKwh = (a, b) => (Math.round(a.kwh) - Math.round(b.kwh)) || ((a.sort || 0) - (b.sort || 0));
+  const fit = list.filter(u => u.kwh >= target - 0.5).sort(byKwh)[0]
            || list.slice().sort((a, b) => b.kwh - a.kwh)[0];
   $("fUze").value = fit.id;
 }
