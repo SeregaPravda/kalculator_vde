@@ -50,7 +50,7 @@ create table if not exists public.pv_prices (
   power_segment    text not null check (power_segment in ('small','medium','large')),
   rate_usd_per_kwp numeric not null,
   updated_at       timestamptz default now(),
-  updated_by       uuid references public.profiles(id),
+  updated_by       uuid references public.profiles(id) on delete set null,
   unique (system_type, placement, power_segment)
 );
 
@@ -59,7 +59,7 @@ create table if not exists public.battery_prices (
   capacity_segment text not null unique check (capacity_segment in ('small','medium','large')),
   rate_usd_per_kwh numeric not null,
   updated_at       timestamptz default now(),
-  updated_by       uuid references public.profiles(id)
+  updated_by       uuid references public.profiles(id) on delete set null
 );
 
 -- Ціни УЗЕ. Відкриті для всіх авторизованих (не таємниця), редагує адмін.
@@ -80,7 +80,7 @@ create table if not exists public.uze_prices (
   sort        integer default 100,
   active      boolean not null default true,
   updated_at  timestamptz default now(),
-  updated_by  uuid references public.profiles(id)
+  updated_by  uuid references public.profiles(id) on delete set null
 );
 
 -- ----------------------------------------------------------- ЛІЧИЛЬНИК КП

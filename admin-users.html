@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Користувачі</title>
-<link rel="stylesheet" href="css/app.css?v=202609021046">
+<link rel="stylesheet" href="css/app.css?v=202609021113">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -16,15 +16,15 @@
  <div class="card"><h2>Як додати нового менеджера</h2>
   <ol style="font-size:13px;line-height:1.7;margin:0;padding-left:20px">
    <li>Supabase → <b>Authentication → Users → Add user → Create new user</b>. Вкажіть пошту й пароль, увімкніть «Auto Confirm User».</li>
-   <li>Профіль створиться автоматично з роллю «Менеджер». Оновіть цю сторінку.</li>
-   <li>Заповніть ПІБ, посаду, філію, телефон і натисніть «Зберегти зміни».</li>
+   <li>Профіль створиться автоматично. Якщо пошту заздалегідь внесено в таблицю <code>pending_profiles</code> (Supabase → Table Editor) — ПІБ, телефон, філія і роль підтягнуться самі; інакше — заповніть тут і натисніть «Зберегти зміни».</li>
+   <li>Звільнення: не видаляйте користувача, у якого є сформовані КП (історія посилається на нього) — натисніть у Supabase <b>Ban user</b>. Видалення можливе лише для тих, хто ще нічого не формував.</li>
   </ol>
   <div class="hint" style="margin-top:8px">Кнопка «створити користувача» прямо на сайті потребує серверної функції з сервісним ключем — заплановано на наступну версію.</div>
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609021046"></script>
-<script src="js/auth.js?v=202609021046"></script>
+<script src="js/config.js?v=202609021113"></script>
+<script src="js/auth.js?v=202609021113"></script>
 <script>
 let ROWS = [], ME = null;
 const F = ["full_name", "position", "filial", "phone", "email"];
