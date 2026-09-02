@@ -433,7 +433,16 @@ insert into public.pending_profiles (email, full_name, phone, filial, position) 
   ('kostiantyn.podolynnyi@pa.ua', 'Подолинний Костянтин',  '+380674770922', 'Вінниця',      'Менеджер з прямих продажів'),
   ('dmytro.osadchuk@pa.ua',       'Осадчук Дмитро',        '+380674950867', 'Вінниця',      'Менеджер з прямих продажів'),
   ('oleksandr.velhus@pa.ua',      'Вельгус Олександр',     '+380674308108', 'Вінниця',      'Менеджер з прямих продажів'),
-  ('zoreslav.lysyi@pa.ua',         'Лисий Зореслав',        '+380635832694', 'Хмельницький', 'Менеджер з прямих продажів')
+  ('zoreslav.lysyi@pa.ua',         'Лисий Зореслав',        '+380635832694', 'Хмельницький', 'Менеджер з прямих продажів'),
+  ('illia.tymtsias@pa.ua',         'Тимцясь Ілля',          '+380971044255', 'Хмельницький', 'Менеджер з прямих продажів'),
+  ('pavlo.boichuk@pa.ua',          'Бойчук Павло',          '+380673534523', 'Львів',        'Менеджер з прямих продажів'),
+  ('ihor.usatiuk@pa.ua',           'Усатюк Ігор',           '+380992258420', 'Вінниця',      'Менеджер з прямих продажів')
 on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial, position = excluded.position;
 update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial, position = pp.position
 from public.pending_profiles pp where lower(p.email) = lower(pp.email) and p.role = 'manager';
+
+-- Керівник бізнесу ВДЕ = адмін (02.09.2026)
+insert into public.pending_profiles (email, full_name, phone, filial, position, role)
+values ('andrii.deineko@pa.ua', 'Дейнеко Андрій', '+380504447078', 'Вінниця', 'Керівник бізнесу ВДЕ', 'admin')
+on conflict (email) do update set role = 'admin', position = excluded.position, phone = excluded.phone;
+update public.profiles set role = 'admin', position = 'Керівник бізнесу ВДЕ' where lower(email) = 'andrii.deineko@pa.ua';
