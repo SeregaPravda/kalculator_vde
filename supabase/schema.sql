@@ -11,7 +11,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   full_name   text not null default '',
-  position    text default 'Менеджер напрямку ВДЕ',
+  position    text default 'Менеджер з прямих продажів',
   phone       text,
   email       text,
   filial      text not null default 'Вінниця',
@@ -352,7 +352,7 @@ create table if not exists public.pending_profiles (
   full_name text not null,
   phone     text,
   filial    text not null default 'Вінниця',
-  position  text default 'Менеджер напрямку ВДЕ',
+  position  text default 'Менеджер з прямих продажів',
   role      text not null default 'manager' check (role in ('manager','admin'))
 );
 alter table public.pending_profiles enable row level security;
@@ -368,7 +368,7 @@ begin
   insert into public.profiles (id, email, full_name, phone, filial, position, role)
   values (new.id, new.email,
           coalesce(pp.full_name, new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-          pp.phone, coalesce(pp.filial, 'Вінниця'), coalesce(pp.position, 'Менеджер напрямку ВДЕ'), coalesce(pp.role, 'manager'))
+          pp.phone, coalesce(pp.filial, 'Вінниця'), coalesce(pp.position, 'Менеджер з прямих продажів'), coalesce(pp.role, 'manager'))
   on conflict (id) do nothing;
   return new;
 end $$;
