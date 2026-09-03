@@ -47,7 +47,7 @@ create table if not exists public.pv_prices (
   id               serial primary key,
   system_type      text not null check (system_type in ('network','hybrid')),
   placement        text not null check (placement in ('roof','ground')),
-  power_segment    text not null check (power_segment in ('small','medium','large')),
+  power_segment    text not null check (power_segment in ('small','medium','large','xl')),  -- до 30 / 30–100 / 100–300 / від 300
   rate_usd_per_kwp numeric not null,
   updated_at       timestamptz default now(),
   updated_by       uuid references public.profiles(id) on delete set null,
@@ -116,14 +116,16 @@ begin
 end $$;
 
 -- ------------------------------------------------------------- СТАРТОВІ ЦІНИ
--- Значення 1:1 з calc_engine.js v2.0 (PRICE_PER_KWP_USD, BATTERY_PRICE_PER_KWH_USD)
+-- Матриця комерційної функції від 02.09.2026 (4 сегменти)
 insert into public.pv_prices (system_type, placement, power_segment, rate_usd_per_kwp) values
-  ('network','roof','small',420), ('network','ground','small',450),
-  ('network','roof','medium',390), ('network','ground','medium',430),
-  ('network','roof','large',380), ('network','ground','large',420),
-  ('hybrid','roof','small',420),  ('hybrid','ground','small',450),
-  ('hybrid','roof','medium',390), ('hybrid','ground','medium',430),
-  ('hybrid','roof','large',380),  ('hybrid','ground','large',420)
+  ('network','roof','small',460), ('network','ground','small',500),
+  ('network','roof','medium',440), ('network','ground','medium',480),
+  ('network','roof','large',370), ('network','ground','large',450),
+  ('network','roof','xl',360),    ('network','ground','xl',420),
+  ('hybrid','roof','small',630),  ('hybrid','ground','small',650),
+  ('hybrid','roof','medium',550), ('hybrid','ground','medium',570),
+  ('hybrid','roof','large',500),  ('hybrid','ground','large',570),
+  ('hybrid','roof','xl',490),     ('hybrid','ground','xl',580)
 on conflict (system_type, placement, power_segment) do nothing;
 
 insert into public.battery_prices (capacity_segment, rate_usd_per_kwh) values
@@ -139,7 +141,8 @@ insert into public.uze_prices (uze_id, brand, model, kw, kwh, cooling, price_eur
    'Гібридний інвертор 125 кВт (Gen 2) · батарейна шафа 261,24 кВт·год · кабелі АКБ · вбудований EMS · трифазний лічильник',
    '5 років на продукт / 10 років на продуктивність','KSTR-QTN-20262807-2 від 28.07.2026, дійсний 1 місяць',20),
   ('UZE-EN-261','Elecnova','ECO-E261LP-2A · 125 кВт / 261 кВт·год',125,261,'Рідинне',30500,false,'уточнити',
-   'уточнити склад комплекту','уточнити','закупівельна ціна, 22.08.2026',30),
+   'Гібридний інвертор 125 кВт · батарейна шафа 261 кВт·год · кабелі АКБ · вбудований EMS · трифазний лічильник',
+   '5 років на продукт / 10 років на продуктивність','закупівельна ціна, 22.08.2026',30),
   ('UZE-HW-241','Huawei','LUNA2000-241-2S1',108,241,'Гібридне (рідинне + повітряне)',58000,true,'уточнити',
    'Батарейні модулі · вбудований PCS · RCM · система терморегулювання · TRSD (придушення теплового розгону) · DC-DC опційно',
    'уточнити','рахунок від 07.05.2026',40)
@@ -223,7 +226,7 @@ begin
     if pl not in ('roof','ground') then
       raise exception 'placement must be roof|ground';
     end if;
-    pcat := case when kwp <= 30 then 'small' when kwp < 100 then 'medium' else 'large' end;
+    pcat := case when kwp <= 30 then 'small' when kwp < 100 then 'medium' when kwp < 300 then 'large' else 'xl' end;
     select rate_usd_per_kwp into rate_a from public.pv_prices
       where system_type = st and placement = pl and power_segment = pcat;
     if rate_a is null then
