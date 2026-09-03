@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609030828">
+<link rel="stylesheet" href="css/app.css?v=202609030845">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -113,11 +113,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609030828"></script>
-<script src="js/auth.js?v=202609030828"></script>
-<script src="js/calc_engine.js?v=202609030828"></script>
-<script src="js/data.js?v=202609030828"></script>
-<script src="js/photo.js?v=202609030828"></script>
+<script src="js/config.js?v=202609030845"></script>
+<script src="js/auth.js?v=202609030845"></script>
+<script src="js/calc_engine.js?v=202609030845"></script>
+<script src="js/data.js?v=202609030845"></script>
+<script src="js/photo.js?v=202609030845"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -258,6 +258,7 @@ function quoteParams() {
   return {
     system_type: S.type, placement: S.place,
     installed_dc_kwp: CFG.kwp, battery_kwh: CFG.BAT ? CFG.BAT.totalKwh : 0,
+    inverter_ac_kw: CFG.actualAc,          // сегмент АКБ: LV (<50 кВт гібрид) / HV (≥50 кВт, Deye F16)
     uze_id: CFG.UZ && CFG.UZ.qty ? CFG.UZ.id : null,
     uze_qty: CFG.UZ && CFG.UZ.qty ? CFG.UZ.qty : null,
     uze_total_eur: CFG.UZ && CFG.UZ.qty ? CFG.UZ.totalEur : null,
@@ -474,7 +475,7 @@ function render() {
     if (IS_ADMIN && PR.pvPriceUsd != null) {
       eco.push(["PV-частина", nf(PR.pvPriceUsd) + " $  (" + nf(PR.pricePerKwpUsd) + " $/кВт)"]);
       if (PR.batteryPriceUsd) eco.push(
-        ["Накопичення", nf(PR.batteryPriceUsd) + " $  (" + nf(PR.pricePerKwhUsd) + " $/кВт·год)"]);
+        ["Накопичення" + (PR.batteryCategory ? " (" + PR.batteryCategory.toUpperCase() + (PR.batteryCategory === "hv" ? ", Deye F16" : "") + ")" : ""), nf(PR.batteryPriceUsd) + " $  (" + nf(PR.pricePerKwhUsd) + " $/кВт·год)"]);
     }
     eco.push(["Вартість СЕС", nf(PR.estimatedTotalPriceUsd) + " $"],
              ["у гривні", nf(CFG.uah) + " грн"], ["Курс", nf(CFG.fx, 2) + " грн/$"]);
@@ -604,7 +605,7 @@ function buildOffer() {
      `${nf(R.inverterQuantity)} шт`]
   ];
   if (hyb && CFG.BAT && CFG.BAT.totalKwh > 0) spec.push(
-    [`Акумуляторні батареї ${D.batBrands.join(" · ")}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
+    [`Акумуляторні батареї ${CFG.actualAc >= 50 ? "Deye F16 (HV)" : D.batBrands.join(" · ") + " (LV)"}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
   const included = [
     ["Монтажна конструкція для фотомодулів", "повний комплект"],
     ["Кабельні лінії DC", "повний комплект"],

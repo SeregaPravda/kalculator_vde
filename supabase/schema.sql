@@ -56,7 +56,8 @@ create table if not exists public.pv_prices (
 
 create table if not exists public.battery_prices (
   id               serial primary key,
-  capacity_segment text not null unique check (capacity_segment in ('small','medium','large')),
+  -- сегмент за потужністю ГІБРИДНОГО ІНВЕРТОРА: lv = до 50 кВт, hv = від 50 кВт (з 03.09.2026)
+  capacity_segment text not null unique check (capacity_segment in ('lv','hv')),
   rate_usd_per_kwh numeric not null,
   updated_at       timestamptz default now(),
   updated_by       uuid references public.profiles(id) on delete set null
@@ -128,8 +129,9 @@ insert into public.pv_prices (system_type, placement, power_segment, rate_usd_pe
   ('hybrid','roof','xl',490),     ('hybrid','ground','xl',580)
 on conflict (system_type, placement, power_segment) do nothing;
 
+-- АКБ: LV (гібрид до 50 кВт) 340 $/кВт·год, HV (від 50 кВт, Deye F16) 250 $/кВт·год — комерційна функція 03.09.2026
 insert into public.battery_prices (capacity_segment, rate_usd_per_kwh) values
-  ('small',460), ('medium',430), ('large',400)
+  ('lv',340), ('hv',250)
 on conflict (capacity_segment) do nothing;
 
 -- УЗЕ: KSTAR — рахунки KSTR-QTN-20262807 від 28.07.2026; Elecnova і Huawei — дані комерційної функції 22.08.2026
@@ -207,6 +209,7 @@ declare
   pl         text := p->>'placement';
   kwp        numeric := coalesce((p->>'installed_dc_kwp')::numeric, 0);
   kwh        numeric := coalesce((p->>'battery_kwh')::numeric, 0);
+  inv_kw     numeric := coalesce((p->>'inverter_ac_kw')::numeric, 0);   -- потужність гібридного інвертора → сегмент АКБ
   pcat       text; bcat text;
   rate_a     numeric := 0; rate_b numeric := 0;
   pv_usd     numeric := 0; bat_usd numeric := 0; total_usd numeric := 0;
@@ -235,7 +238,7 @@ begin
     pv_usd := kwp * rate_a;
 
     if st = 'hybrid' and kwh > 0 then
-      bcat := case when kwh <= 30 then 'small' when kwh < 100 then 'medium' else 'large' end;
+      bcat := case when inv_kw < 50 then 'lv' else 'hv' end;
       select rate_usd_per_kwh into rate_b from public.battery_prices where capacity_segment = bcat;
       if rate_b is null then
         raise exception 'no battery price for %', bcat;
