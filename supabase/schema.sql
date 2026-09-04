@@ -480,7 +480,7 @@ insert into public.pending_profiles (email, full_name, phone, filial, position, 
   ('roman.stetsko@pa.ua',        'Стецько Роман',        '+380674308399', 'Львів',        'Керівник філії',               'head'),
   ('yurii.kobylianskyi@pa.ua',   'Кобилянський Юрій',    '+380682119633', 'Хмельницький', 'Керівник філії',               'head'),
   ('anton.vasylenko@pa.ua',      'Василенко Антон',      '+380988898687', 'Дніпро',       'Керівник філії',               'head'),
-  ('vladyslav.diachuk@pa.ua',    'Дячук Владислав',      '+380674305835', 'Усі філії',    'Керівник з розвитку регіонів', 'head')
+  ('vladyslav.diachuk@pa.ua',    'Дячук Владислав',      '+380674305835', 'Вінниця',      'Керівник з розвитку регіонів', 'head')
 on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial, position = excluded.position, role = excluded.role;
 update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial, position = pp.position, role = pp.role
 from public.pending_profiles pp where lower(p.email) = lower(pp.email) and pp.role = 'head';
