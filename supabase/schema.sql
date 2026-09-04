@@ -484,3 +484,17 @@ insert into public.pending_profiles (email, full_name, phone, filial, position, 
 on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial, position = excluded.position, role = excluded.role;
 update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial, position = pp.position, role = pp.role
 from public.pending_profiles pp where lower(p.email) = lower(pp.email) and pp.role = 'head';
+
+-- ------------------------------------------------ КУРС ПРИВАТБАНКУ (04.09.2026)
+-- Браузер не може звертатись до api.privatbank.ua напряму (CORS) — проксі через розширення http.
+create extension if not exists http with schema extensions;
+create or replace function public.fx_rates()
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare r extensions.http_response;
+begin
+  select * into r from extensions.http_get('https://api.privatbank.ua/p24api/pubinfo?exchange&json&coursid=5');
+  if r.status <> 200 then raise exception 'privatbank http %', r.status; end if;
+  return r.content::jsonb;
+end $$;
+revoke all on function public.fx_rates() from public, anon;
+grant execute on function public.fx_rates() to authenticated;

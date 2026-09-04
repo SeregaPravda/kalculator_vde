@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609040941">
+<link rel="stylesheet" href="css/app.css?v=202609040945">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -115,11 +115,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609040941"></script>
-<script src="js/auth.js?v=202609040941"></script>
-<script src="js/calc_engine.js?v=202609040941"></script>
-<script src="js/data.js?v=202609040941"></script>
-<script src="js/photo.js?v=202609040941"></script>
+<script src="js/config.js?v=202609040945"></script>
+<script src="js/auth.js?v=202609040945"></script>
+<script src="js/calc_engine.js?v=202609040945"></script>
+<script src="js/data.js?v=202609040945"></script>
+<script src="js/photo.js?v=202609040945"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -160,8 +160,10 @@ async function loadUzePrices() {
 async function loadFx() {
   const set = (id, hintId, v, ccy) => { $(id).value = v.toFixed(2); $(hintId).textContent = `ПриватБанк, продаж ${ccy}: ${v.toFixed(2)} грн · ${new Date().toLocaleDateString("uk-UA")}`; };
   try {
-    const r = await fetch("https://api.privatbank.ua/p24api/pubinfo?exchange&json&coursid=5", { cache: "no-store" });
-    const list = await r.json();
+    /* через RPC fx_rates() — Supabase сам запитує ПриватБанк (прямий fetch блокує CORS) */
+    const { data, error } = await sb.rpc("fx_rates");
+    if (error) throw error;
+    const list = Array.isArray(data) ? data : JSON.parse(data);
     const usd = list.find(x => x.ccy === "USD"), eur = list.find(x => x.ccy === "EUR");
     if (usd && Number(usd.sale) > 0) set("fFx", "fxHint", Number(usd.sale), "$");
     if (eur && Number(eur.sale) > 0) set("fFxEur", "fxEurHint", Number(eur.sale), "€");
