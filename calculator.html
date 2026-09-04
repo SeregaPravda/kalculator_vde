@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609030845">
+<link rel="stylesheet" href="css/app.css?v=202609040934">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -56,8 +56,10 @@
     <div class="pvonly"><label class="f">Ліміт видачі в мережу, кВт</label><input type="number" id="fExport" placeholder="не обмежено" step="any"></div>
     <div class="pvonly"><label class="f">Кут нахилу, °</label><input type="number" id="fTilt" value="30" step="1"></div>
     <div class="pvonly"><label class="f">Азимут, ° (0 = південь)</label><input type="number" id="fAz" value="0" step="1"></div>
-    <div class="pvonly"><label class="f">Курс, грн/$</label><input type="number" id="fFx" value="44.80" step="0.01"></div>
-    <div class="uzeonly hide"><label class="f">Курс, грн/€</label><input type="number" id="fFxEur" value="48.50" step="0.01"></div>
+    <div class="pvonly"><label class="f">Курс, грн/$</label><input type="number" id="fFx" value="44.80" step="0.01">
+      <div class="hint" id="fxHint">ПриватБанк, продаж — завантажується…</div></div>
+    <div class="uzeonly hide"><label class="f">Курс, грн/€</label><input type="number" id="fFxEur" value="48.50" step="0.01">
+      <div class="hint" id="fxEurHint"></div></div>
     <div class="pvonly"><label class="f">Горизонт окупності, років</label><input type="number" id="fYears" value="10" min="3" max="25" step="1"></div>
     <div class="pvonly"><label class="f">Режим профілю</label><select id="fMode">
       <option value="hourly">Погодинний (з оцінкою кліпінгу)</option>
@@ -113,11 +115,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609030845"></script>
-<script src="js/auth.js?v=202609030845"></script>
-<script src="js/calc_engine.js?v=202609030845"></script>
-<script src="js/data.js?v=202609030845"></script>
-<script src="js/photo.js?v=202609030845"></script>
+<script src="js/config.js?v=202609040934"></script>
+<script src="js/auth.js?v=202609040934"></script>
+<script src="js/calc_engine.js?v=202609040934"></script>
+<script src="js/data.js?v=202609040934"></script>
+<script src="js/photo.js?v=202609040934"></script>
 <script>
 const $ = i => document.getElementById(i);
 const S = { type: "network", place: "roof", addUze: "no" };
@@ -152,6 +154,23 @@ async function loadUzePrices() {
              withVatEur: withVat, eurPerKwh: +(withVat / Number(u.kwh)).toFixed(1) };
   });
   return null;
+}
+
+/* ---- Курс ПриватБанку (готівковий, «продаж») — підставляється при відкритті, менеджер може змінити ---- */
+async function loadFx() {
+  const set = (id, hintId, v, ccy) => { $(id).value = v.toFixed(2); $(hintId).textContent = `ПриватБанк, продаж ${ccy}: ${v.toFixed(2)} грн · ${new Date().toLocaleDateString("uk-UA")}`; };
+  try {
+    const r = await fetch("https://api.privatbank.ua/p24api/pubinfo?exchange&json&coursid=5", { cache: "no-store" });
+    const list = await r.json();
+    const usd = list.find(x => x.ccy === "USD"), eur = list.find(x => x.ccy === "EUR");
+    if (usd && Number(usd.sale) > 0) set("fFx", "fxHint", Number(usd.sale), "$");
+    if (eur && Number(eur.sale) > 0) set("fFxEur", "fxEurHint", Number(eur.sale), "€");
+    if (!usd) throw new Error("немає USD у відповіді");
+    return true;
+  } catch (e) {
+    $("fxHint").textContent = "Курс ПриватБанку недоступний — перевірте значення вручну.";
+    return false;
+  }
 }
 
 /* ---- стан форми: серіалізація для повтору КП з історії ---- */
@@ -635,8 +654,11 @@ function buildOffer() {
   <div style="flex:1">
    <div class="kicker">Індикативна пропозиція</div>
    <div class="cname">${m.client || "—"}</div>
-   <div class="cline">${CFG.typeLabel} СЕС ${pw} кВт · інвертори ${acw} кВт · ${CFG.placeLabel.toLowerCase()}${
-     hyb && CFG.BAT && CFG.BAT.totalKwh ? ` · АКБ ${nf(CFG.BAT.totalKwh, 1)} кВт·год` : ""}<br>${m.city}</div>
+   <div class="cline">${bessOnly
+     ? (U ? `Система накопичення енергії ${U.brand} · ${U.qty} × ${nf(U.kwh, 1)} кВт·год · ${nf(U.totalKw)} кВт / ${nf(U.totalKwh, 1)} кВт·год` : "Система накопичення енергії")
+     : `${CFG.typeLabel} СЕС ${pw} кВт · інвертори ${acw} кВт · ${CFG.placeLabel.toLowerCase()}${
+     hyb && CFG.BAT && CFG.BAT.totalKwh ? ` · АКБ ${nf(CFG.BAT.totalKwh, 1)} кВт·год` : ""}`}${
+     !bessOnly && U ? ` · УЗЕ ${U.qty} × ${nf(U.kwh, 1)} кВт·год` : ""}<br>${m.city}</div>
   </div>
  </div>
  <div class="peach">
@@ -841,6 +863,7 @@ $("fUzeKwh").addEventListener("input", () => { if (!manualUze) autoPickUze(); ru
   const uzeErr = await loadUzePrices();
   if (uzeErr) $("warnBox").insertAdjacentHTML("afterbegin", `<div class="alert warn">${esc(uzeErr)}</div>`);
   seg("segType", "type"); seg("segPlace", "place"); seg("segUze", "addUze");
+  await loadFx();                       // курс ПриватБанку до першого розрахунку
   fillUze(); syncVisibility(); autoAc();
   loadHistory();
 })();

@@ -3,7 +3,8 @@
 /* global supabase, CONFIG */
 
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-const ROLE_LABEL = { manager: "Менеджер", admin: "Адмін" };
+const ROLE_LABEL = { manager: "Менеджер", admin: "Адмін", head: "Керівник філії" };
+const isStaff = p => p && (p.role === "admin" || p.role === "head");
 
 const esc = s => String(s == null ? "" : s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -34,6 +35,7 @@ async function requireAuth(role) {
     return null;
   }
   if (role === "admin" && a.profile.role !== "admin") { location.replace("calculator.html"); return null; }
+  if (role === "staff" && !isStaff(a.profile)) { location.replace("calculator.html"); return null; }   // адмін або керівник філії
   renderNav(a.profile);
   sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") location.replace("index.html"); });
   return a;
@@ -45,6 +47,8 @@ function renderNav(profile) {
   const links = [["calculator.html", "Калькулятор"]];
   if (profile.role === "admin")
     links.push(["admin-prices.html", "Ціни"], ["admin-dashboard.html", "Лічильник КП"], ["admin-users.html", "Користувачі"]);
+  else if (profile.role === "head")
+    links.push(["admin-prices.html", "Ціни"], ["admin-dashboard.html", "Аналітика"]);
   el.innerHTML = `<div class="nav">
     <div class="logo">Група «<span>ПРОМАВТОМАТИКА</span>»</div>
     <div class="links">${links.map(l => `<a href="${l[0]}" class="${page === l[0] ? "on" : ""}">${l[1]}</a>`).join("")}</div>

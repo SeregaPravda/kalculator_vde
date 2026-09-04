@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Лічильник КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609030845">
+<link rel="stylesheet" href="css/app.css?v=202609040934">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -11,6 +11,8 @@
  <div class="toolbar">
   <label class="f" style="margin:0">Період</label>
   <input type="date" id="from"> <span class="muted">—</span> <input type="date" id="to">
+  <label class="f" style="margin:0 0 0 8px">Філія</label>
+  <select id="filialSel" style="width:auto;padding:8px 10px"><option value="">Усі філії</option></select>
   <button class="btn" style="padding:9px 14px;font-size:12px" id="apply">Показати</button>
   <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="month">Цей місяць</button>
   <button class="btn" style="padding:9px 14px;font-size:12px;background:var(--g)" data-q="all">Весь час</button>
@@ -38,8 +40,8 @@
 </div>
 <script src="js/vendor/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609030845"></script>
-<script src="js/auth.js?v=202609030845"></script>
+<script src="js/config.js?v=202609040934"></script>
+<script src="js/auth.js?v=202609040934"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна", bess: "BESS" };
 const PLACE = { roof: "Дах", ground: "Земля" };
@@ -184,7 +186,9 @@ async function load() {
   const { f, t } = range();
   const s = await sb.rpc("kp_stats", { date_from: f, date_to: t });
   if (s.error) { $("stat").querySelector("tbody").innerHTML = `<tr><td colspan="6">${esc(s.error.message)}</td></tr>`; return; }
-  const rows = s.data; STATS = rows;
+  /* фільтр по філії: керівник філії бачить свою, адмін — будь-яку або всі */
+  const fSel = $("filialSel").value;
+  const rows = fSel ? s.data.filter(r => r.filial === fSel) : s.data; STATS = rows;
   const total = rows.reduce((a, r) => a + Number(r.kp_count), 0);
   const calcs = rows.reduce((a, r) => a + Number(r.calc_count || 0), 0);
   const usd = rows.reduce((a, r) => a + Number(r.sum_usd), 0);
@@ -224,7 +228,7 @@ async function load() {
   if (f) q = q.gte("created_at", f); if (t) q = q.lt("created_at", t);
   const l = await q;
   if (l.error) { $("logNote").textContent = l.error.message; return; }
-  LOG = l.data;
+  LOG = fSel ? l.data.filter(r => r.profiles && r.profiles.filial === fSel) : l.data;
   renderLog();
   $("logNote").textContent = l.data.length >= 2000 ? "Показано останні 2000 записів — звузьте період." : "";
 }
@@ -251,7 +255,14 @@ function drawBars(el, data, unit) {
   $(el).innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;font-family:Arial">${g}</svg>`;
 }
 (async () => {
-  const a = await requireAuth("admin"); if (!a) return;
+  const a = await requireAuth("staff"); if (!a) return;
+  /* список філій — з профілів менеджерів; керівнику філії за замовчуванням підставляємо його філію */
+  const pf = await sb.from("profiles").select("filial").eq("role", "manager");
+  const filials = [...new Set((pf.data || []).map(p => p.filial).filter(Boolean))].sort();
+  $("filialSel").innerHTML = '<option value="">Усі філії</option>' + filials.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join("");
+  if (a.profile.role === "head" && filials.includes(a.profile.filial)) $("filialSel").value = a.profile.filial;
+  $("filialSel").onchange = load;
+  if (a.profile.role === "head") document.querySelector("h1").textContent = "Аналітика по менеджерах";
   const d = new Date(); $("from").value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
   $("apply").onclick = load; $("csv").onclick = exportXlsx; $("onlyLast").onchange = renderLog;
   document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {

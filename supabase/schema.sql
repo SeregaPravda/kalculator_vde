@@ -15,7 +15,7 @@ create table if not exists public.profiles (
   phone       text,
   email       text,
   filial      text not null default 'Вінниця',
-  role        text not null default 'manager' check (role in ('manager','admin')),
+  role        text not null default 'manager' check (role in ('manager','admin','head')),  -- head = керівник філії (перегляд цін, аналітика)
   created_at  timestamptz default now()
 );
 
@@ -40,6 +40,12 @@ create trigger on_auth_user_created
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+$$;
+
+-- Адмін або керівник філії: читання цін і статистики
+create or replace function public.is_staff()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role in ('admin','head'))
 $$;
 
 -- ------------------------------------------------------------------- ЦІНИ
@@ -316,7 +322,7 @@ language sql stable security definer set search_path = public as $$
   from public.profiles pr
   left join lastkp k on k.manager_id = pr.id
   left join allk a on a.mid = pr.id
-  where public.is_admin() and pr.role = 'manager'
+  where public.is_staff() and pr.role = 'manager'
   group by pr.id, pr.full_name, pr.filial
   order by count(k.id) desc, pr.full_name
 $$;
@@ -359,7 +365,7 @@ create table if not exists public.pending_profiles (
   phone     text,
   filial    text not null default 'Вінниця',
   position  text default 'Менеджер з прямих продажів',
-  role      text not null default 'manager' check (role in ('manager','admin'))
+  role      text not null default 'manager' check (role in ('manager','admin','head'))
 );
 alter table public.pending_profiles enable row level security;
 drop policy if exists pending_profiles_admin on public.pending_profiles;
@@ -452,3 +458,29 @@ insert into public.pending_profiles (email, full_name, phone, filial, position, 
 values ('andrii.deineko@pa.ua', 'Дейнеко Андрій', '+380504447078', 'Вінниця', 'Керівник бізнесу ВДЕ', 'admin')
 on conflict (email) do update set role = 'admin', position = excluded.position, phone = excluded.phone;
 update public.profiles set role = 'admin', position = 'Керівник бізнесу ВДЕ' where lower(email) = 'andrii.deineko@pa.ua';
+
+-- ------------------------------------------------ РОЛЬ «КЕРІВНИК ФІЛІЇ» (03.09.2026)
+-- Бачить ціни (тільки читання), аналітику по менеджерах з фільтром по філії. Нічого не змінює.
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check check (role in ('manager','admin','head'));
+alter table public.pending_profiles drop constraint if exists pending_profiles_role_check;
+alter table public.pending_profiles add constraint pending_profiles_role_check check (role in ('manager','admin','head'));
+drop policy if exists profiles_staff_select on public.profiles;
+create policy profiles_staff_select on public.profiles for select using (public.is_staff());
+drop policy if exists pv_prices_head_read on public.pv_prices;
+create policy pv_prices_head_read on public.pv_prices for select using (public.is_staff());
+drop policy if exists battery_prices_head_read on public.battery_prices;
+create policy battery_prices_head_read on public.battery_prices for select using (public.is_staff());
+drop policy if exists uze_prices_head_read on public.uze_prices;
+create policy uze_prices_head_read on public.uze_prices for select using (public.is_staff());
+drop policy if exists kp_log_staff_select on public.kp_log;
+create policy kp_log_staff_select on public.kp_log for select using (manager_id = auth.uid() or public.is_staff());
+
+insert into public.pending_profiles (email, full_name, phone, filial, position, role) values
+  ('roman.stetsko@pa.ua',        'Стецько Роман',        '+380674308399', 'Львів',        'Керівник філії',               'head'),
+  ('yurii.kobylianskyi@pa.ua',   'Кобилянський Юрій',    '+380682119633', 'Хмельницький', 'Керівник філії',               'head'),
+  ('anton.vasylenko@pa.ua',      'Василенко Антон',      '+380988898687', 'Дніпро',       'Керівник філії',               'head'),
+  ('vladyslav.diachuk@pa.ua',    'Дячук Владислав',      '+380674305835', 'Усі філії',    'Керівник з розвитку регіонів', 'head')
+on conflict (email) do update set full_name = excluded.full_name, phone = excluded.phone, filial = excluded.filial, position = excluded.position, role = excluded.role;
+update public.profiles p set full_name = pp.full_name, phone = pp.phone, filial = pp.filial, position = pp.position, role = pp.role
+from public.pending_profiles pp where lower(p.email) = lower(pp.email) and pp.role = 'head';

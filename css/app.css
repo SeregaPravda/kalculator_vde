@@ -171,5 +171,6 @@ table.edit input{padding:6px 8px;font-size:13px;max-width:140px}
 .toolbar input{width:auto}
 .badge{display:inline-block;font-size:10px;font-weight:bold;padding:2px 8px;border-radius:10px;background:#F1EFEC;color:#6A635D}
 .badge.admin{background:#FDEADF;color:var(--o)}
+.badge.head{background:#E8F0FA;color:#2C5282}
 .pending{opacity:.55}
 @media print{.nav{display:none!important}}

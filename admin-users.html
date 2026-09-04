@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Користувачі</title>
-<link rel="stylesheet" href="css/app.css?v=202609030845">
+<link rel="stylesheet" href="css/app.css?v=202609040934">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -23,8 +23,8 @@
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609030845"></script>
-<script src="js/auth.js?v=202609030845"></script>
+<script src="js/config.js?v=202609040934"></script>
+<script src="js/auth.js?v=202609040934"></script>
 <script>
 let ROWS = [], ME = null;
 const F = ["full_name", "position", "filial", "phone", "email"];
@@ -39,6 +39,7 @@ async function load() {
     ${F.map(f => `<td><input data-f="${f}" value="${esc(p[f] || "")}"></td>`).join("")}
     <td><select data-f="role" ${p.id === user.id ? "disabled" : ""}>
       <option value="manager" ${p.role === "manager" ? "selected" : ""}>Менеджер</option>
+      <option value="head" ${p.role === "head" ? "selected" : ""}>Керівник філії</option>
       <option value="admin" ${p.role === "admin" ? "selected" : ""}>Адмін</option></select></td></tr>`).join("");
 }
 async function save() {
