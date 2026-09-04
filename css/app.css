@@ -174,3 +174,5 @@ table.edit input{padding:6px 8px;font-size:13px;max-width:140px}
 .badge.head{background:#E8F0FA;color:#2C5282}
 .pending{opacity:.55}
 @media print{.nav{display:none!important}}
+
+input[readonly]{background:#f3f1ef;color:#6b6663;cursor:default}

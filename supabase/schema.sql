@@ -498,3 +498,54 @@ begin
 end $$;
 revoke all on function public.fx_rates() from public, anon;
 grant execute on function public.fx_rates() to authenticated;
+-- ------------------------------------------------ КУРС ПРИВАТБАНКУ: фіксація на день (04.09.2026)
+-- Курс зберігається в таблиці й оновлюється автоматично о 6:30 за Києвом (pg_cron).
+-- Менеджери курс не змінюють; адмін може розблокувати поле вручну (наприклад, якщо API недоступне).
+create table if not exists public.fx_daily (
+  ccy        text primary key,
+  sale       numeric(10,4) not null,
+  buy        numeric(10,4),
+  rate_date  date not null,
+  fetched_at timestamptz not null default now()
+);
+alter table public.fx_daily enable row level security;
+drop policy if exists "fx read staff" on public.fx_daily;
+create policy "fx read staff" on public.fx_daily for select to authenticated using (true);
+
+-- Забирає курс із ПриватБанку та записує в fx_daily. Викликається cron-ом і як резерв із fx_rates().
+create or replace function public.fx_refresh()
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare r extensions.http_response; j jsonb; e jsonb; d date := (now() at time zone 'Europe/Kyiv')::date;
+begin
+  select * into r from extensions.http_get('https://api.privatbank.ua/p24api/pubinfo?exchange&json&coursid=5');
+  if r.status <> 200 then raise exception 'privatbank http %', r.status; end if;
+  j := r.content::jsonb;
+  for e in select * from jsonb_array_elements(j) loop
+    if (e->>'ccy') in ('USD','EUR') and (e->>'sale')::numeric > 0 then
+      insert into public.fx_daily (ccy, sale, buy, rate_date, fetched_at)
+      values (e->>'ccy', (e->>'sale')::numeric, (e->>'buy')::numeric, d, now())
+      on conflict (ccy) do update set sale = excluded.sale, buy = excluded.buy, rate_date = excluded.rate_date, fetched_at = excluded.fetched_at;
+    end if;
+  end loop;
+  return j;
+end $$;
+revoke all on function public.fx_refresh() from public, anon, authenticated;
+
+-- Курс для калькулятора: збережений на сьогодні; якщо cron ще не спрацював — пробує оновити на місці.
+create or replace function public.fx_rates()
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare d date := (now() at time zone 'Europe/Kyiv')::date; out jsonb;
+begin
+  if not exists (select 1 from public.fx_daily where ccy = 'USD' and rate_date = d) then
+    begin perform public.fx_refresh(); exception when others then null; end;
+  end if;
+  select jsonb_agg(jsonb_build_object('ccy', ccy, 'sale', sale, 'buy', buy, 'rate_date', rate_date, 'fetched_at', fetched_at))
+    into out from public.fx_daily;
+  return coalesce(out, '[]'::jsonb);
+end $$;
+revoke all on function public.fx_rates() from public, anon;
+grant execute on function public.fx_rates() to authenticated;
+
+-- Автооновлення: 03:30 і 04:30 UTC = 06:30 за Києвом (літній/зимовий час відповідно).
+create extension if not exists pg_cron;
+select cron.schedule('fx-daily-privatbank', '30 3,4 * * *', $$select public.fx_refresh()$$);

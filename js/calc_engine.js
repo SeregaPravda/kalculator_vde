@@ -284,10 +284,8 @@ function calculateGeneration(p) {
       monthly.push({ monthNumber: m + 1, monthLabel: MONTH_LABELS[m],
                      generationKwh: gen, clippingLossKwh: null, exportLimitLossKwh: null });
     }
-    accuracy = "low";
+    accuracy = "medium";   /* місячний профіль — єдиний режим з 04.09.2026; кліпінг не оцінюється */
     annualClipping = null; annualExportLoss = null;
-    warnings.push("Через відсутність погодинного профілю можливі втрати від обмеження інвертора " +
-                  "оцінені спрощено та не відображають реальну погодинну роботу обладнання.");
   }
 
   const annualGenerationKwh = monthly.reduce((s, x) => s + x.generationKwh, 0);
