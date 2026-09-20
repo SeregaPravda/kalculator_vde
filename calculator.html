@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201840">
+<link rel="stylesheet" href="css/app.css?v=202609201850">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -117,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201840"></script>
-<script src="js/auth.js?v=202609201840"></script>
-<script src="js/calc_engine.js?v=202609201840"></script>
-<script src="js/data.js?v=202609201840"></script>
-<script src="js/photo.js?v=202609201840"></script>
+<script src="js/config.js?v=202609201850"></script>
+<script src="js/auth.js?v=202609201850"></script>
+<script src="js/calc_engine.js?v=202609201850"></script>
+<script src="js/data.js?v=202609201850"></script>
+<script src="js/photo.js?v=202609201850"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -231,6 +231,7 @@ function restoreState(st) {
     $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === S[key]));
   });
   syncVisibility();
+  if ($("fBatModel")) $("fBatModel").value = S.batModel ? "m:" + S.batModel : (S.batCls || "auto");   // тип АКБ з історії
   fillModels(st.v.fInvModel); fillPanels(Number(st.v.fPanel)); fillUze();
   FORM_IDS.forEach(id => { if (st.v[id] != null && !($(id).readOnly && (id === "fFx" || id === "fFxEur"))) $(id).value = st.v[id]; });   // курс дня не перекриваємо старим
   if ($("fUzeKind").value !== st.v.fUzeKind) { $("fUzeKind").value = st.v.fUzeKind; fillUze(); $("fUze").value = st.v.fUze; }
