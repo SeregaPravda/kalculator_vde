@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201818">
+<link rel="stylesheet" href="css/app.css?v=202609201826">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -30,7 +30,7 @@
     <input type="number" id="fBatKwh" value="50" min="0" step="any">
     <div class="hint" id="batHint"></div></div>
   <div class="hybonly hide"><label class="f">Тип АКБ<a href="#" id="batAuto" class="lnkAuto hide">авто</a></label>
-    <div class="seg" id="segBat"><button data-v="lv">LV-стек</button><button data-v="hv">Deye F16</button></div></div>
+    <div class="seg" id="segBat"><button data-v="lv">LV · 51,2 В</button><button data-v="hv">HV-стек</button></div></div>
   <div><label class="f">Ціна в КП</label>
     <div class="seg" id="segVat"><button data-v="with" class="on">З ПДВ</button><button data-v="without">Без ПДВ</button></div>
     <div class="hint" id="vatHint">Матриця цін — з ПДВ. «Без ПДВ» ділить підсумок на 1,2.</div></div>
@@ -117,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201818"></script>
-<script src="js/auth.js?v=202609201818"></script>
-<script src="js/calc_engine.js?v=202609201818"></script>
-<script src="js/data.js?v=202609201818"></script>
-<script src="js/photo.js?v=202609201818"></script>
+<script src="js/config.js?v=202609201826"></script>
+<script src="js/auth.js?v=202609201826"></script>
+<script src="js/calc_engine.js?v=202609201826"></script>
+<script src="js/data.js?v=202609201826"></script>
+<script src="js/photo.js?v=202609201826"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -539,7 +539,7 @@ function render() {
     if (IS_ADMIN && PR.pvPriceUsd != null) {
       eco.push(["PV-частина", nf(PR.pvPriceUsd) + " $  (" + nf(PR.pricePerKwpUsd) + " $/кВт)"]);
       if (PR.batteryPriceUsd) eco.push(
-        ["Накопичення" + (PR.batteryCategory ? " (" + PR.batteryCategory.toUpperCase() + (PR.batteryCategory === "hv" ? ", Deye F16" : "") + ")" : ""), nf(PR.batteryPriceUsd) + " $  (" + nf(PR.pricePerKwhUsd) + " $/кВт·год)"]);
+        ["Накопичення" + (PR.batteryCategory ? " (" + PR.batteryCategory.toUpperCase() + (PR.batteryCategory === "hv" ? ", стек" : ", 51,2 В") + ")" : ""), nf(PR.batteryPriceUsd) + " $  (" + nf(PR.pricePerKwhUsd) + " $/кВт·год)"]);
     }
     eco.push(["Вартість СЕС", nf(PR.estimatedTotalPriceUsd) + " $ " + vatShort()],
              ["у гривні", nf(CFG.uah) + " грн"], ["Курс", nf(CFG.fx, 2) + " грн/$"]);
@@ -669,7 +669,7 @@ function buildOffer() {
      `${nf(R.inverterQuantity)} шт`]
   ];
   if (hyb && CFG.BAT && CFG.BAT.totalKwh > 0) spec.push(
-    [`Акумуляторні батареї ${batClass() === "hv" ? "Deye F16 (HV)" : D.batBrands.join(" · ") + " (LV)"}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
+    [`Акумуляторні батареї ${batClass() === "hv" ? "HV-стек (послідовне з'єднання + control box)" : D.batBrands.join(" · ") + " (LV, 51,2 В)"}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
   const included = [
     ["Монтажна конструкція для фотомодулів", "повний комплект"],
     ["Кабельні лінії DC", "повний комплект"],

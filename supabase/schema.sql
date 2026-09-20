@@ -135,7 +135,7 @@ insert into public.pv_prices (system_type, placement, power_segment, rate_usd_pe
   ('hybrid','roof','xl',490),     ('hybrid','ground','xl',580)
 on conflict (system_type, placement, power_segment) do nothing;
 
--- АКБ: LV (гібрид до 50 кВт) 340 $/кВт·год, HV (від 50 кВт, Deye F16) 250 $/кВт·год — комерційна функція 03.09.2026
+-- АКБ: LV (гібрид до 50 кВт) 340 $/кВт·год, HV (від 50 кВт, послідовний стек) 250 $/кВт·год — комерційна функція 03.09.2026
 insert into public.battery_prices (capacity_segment, rate_usd_per_kwh) values
   ('lv',340), ('hv',250)
 on conflict (capacity_segment) do nothing;
