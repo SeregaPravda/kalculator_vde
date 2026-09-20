@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Ціни</title>
-<link rel="stylesheet" href="css/app.css?v=202609201800">
+<link rel="stylesheet" href="css/app.css?v=202609201807">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -24,15 +24,15 @@
  </div>
  <div class="card"><h2>Системи накопичення (УЗЕ), € за шафу</h2>
   <div class="muted" style="margin-bottom:8px">«Ціна постачальника» — як у рахунку; якщо ПДВ не включено, додається 20 %. «Націнка» — коефіцієнт комерційної функції (1,10 = +10 %). Менеджери бачать лише «Ціну для КП» — ні закупівельну ціну, ні націнку. Неактивні моделі зникають зі списку в калькуляторі.</div>
-  <div style="overflow-x:auto"><table class="edit" id="uzeTbl"><thead><tr><th>Модель</th><th class="num">кВт / кВт·год</th><th class="num">Ціна постачальника, €</th><th>ПДВ</th><th class="num">Націнка, ×</th><th>Умови постачання</th><th>Гарантія</th><th>Джерело ціни</th><th class="num">Ціна для КП, €</th><th class="num">€/кВт·год</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
+  <div style="overflow-x:auto"><table class="edit" id="uzeTbl"><thead><tr><th>Модель</th><th class="num">кВт / кВт·год</th><th class="num">Ціна постачальника, €</th><th>ПДВ</th><th class="num">Націнка, ×</th><th>Умови постачання</th><th>Гарантія</th><th>Джерело ціни</th><th class="num">Ціна для КП, €</th><th class="num">€/кВт·год</th><th>Оновлено</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
  </div>
  <div class="card"><h2>Перевірка</h2>
   <div class="muted">Приклад: мережева, дах, 120 кВт → сегмент 100–300 → 120 × <span id="chk">…</span> $</div>
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201800"></script>
-<script src="js/auth.js?v=202609201800"></script>
+<script src="js/config.js?v=202609201807"></script>
+<script src="js/auth.js?v=202609201807"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна" }, PLACE = { roof: "Дах", ground: "Земля" },
       SEG = { small: "до 30", medium: "30–100", large: "100–300", xl: "від 300" },
@@ -54,12 +54,14 @@ function renderUze() {
     <td><input data-f="warranty" value="${esc(u.warranty || "")}"></td>
     <td><input data-f="source" value="${esc(u.source || "")}" placeholder="рахунок, дата"></td>
     <td class="num"><b>${nf(final)}</b></td><td class="num">${nf(final / Number(u.kwh), 1)}</td>
+    <td class="muted">${u.updated_at ? fmtDate(u.updated_at) : "—"}</td>
     <td><input type="checkbox" data-f="active" ${u.active ? "checked" : ""} style="width:auto"></td></tr>`; }).join("");
 }
 
 async function load() {
   const a = await sb.from("pv_prices").select("*"), b = await sb.from("battery_prices").select("*"),
-        u = await sb.from("uze_prices").select("*").order("sort");
+        u = await sb.from("uze_prices").select("*")
+              .order("updated_at", { ascending: false, nullsFirst: false }).order("sort");   // найновіші зверху
   if (a.error || b.error || u.error) { msg((a.error || b.error || u.error).message, true); return; }
   UZE = u.data; renderUze();
   PV = a.data.sort((x, y) => ORDER[x.system_type] - ORDER[y.system_type] || ORDER[x.power_segment] - ORDER[y.power_segment] || ORDER[x.placement] - ORDER[y.placement]);
