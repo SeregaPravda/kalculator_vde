@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201807">
+<link rel="stylesheet" href="css/app.css?v=202609201812">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -29,9 +29,8 @@
   <div class="hybonly hide"><label class="f">Ємність АКБ, кВт·год</label>
     <input type="number" id="fBatKwh" value="50" min="0" step="any">
     <div class="hint" id="batHint"></div></div>
-  <div class="hybonly hide"><label class="f">Клас АКБ</label>
-    <div class="seg" id="segBat"><button data-v="auto" class="on">Авто</button><button data-v="lv">LV</button><button data-v="hv">HV · Deye F16</button></div>
-    <div class="hint" id="batClsHint"></div></div>
+  <div class="hybonly hide"><label class="f">АКБ — тип</label>
+    <div class="seg" id="segBat"><button data-v="auto" class="on">Авто</button><button data-v="lv">LV-стек</button><button data-v="hv">Deye F16</button></div></div>
   <div><label class="f">Ціна в КП</label>
     <div class="seg" id="segVat"><button data-v="with" class="on">З ПДВ</button><button data-v="without">Без ПДВ</button></div>
     <div class="hint" id="vatHint">Матриця цін — з ПДВ. «Без ПДВ» ділить підсумок на 1,2.</div></div>
@@ -118,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201807"></script>
-<script src="js/auth.js?v=202609201807"></script>
-<script src="js/calc_engine.js?v=202609201807"></script>
-<script src="js/data.js?v=202609201807"></script>
-<script src="js/photo.js?v=202609201807"></script>
+<script src="js/config.js?v=202609201812"></script>
+<script src="js/auth.js?v=202609201812"></script>
+<script src="js/calc_engine.js?v=202609201812"></script>
+<script src="js/data.js?v=202609201812"></script>
+<script src="js/photo.js?v=202609201812"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -442,21 +441,6 @@ function render() {
   $("heroPrice").classList.toggle("pending", pend);
   /* Підказка під вибором класу АКБ: що застосовано і скільки коштувала б альтернатива */
   if ($("segBat")) $("segBat").style.display = SRV_BAT ? "" : "none";
-  if ($("batClsHint")) {
-    let h = "";
-    if (S.type === "hybrid") {
-      const c = batClass();
-      if (!SRV_BAT) h = "Ручний вибір класу АКБ буде доступний після оновлення серверної функції ціни.";
-      else h = S.batCls === "auto"
-        ? `Авто за інвертором ${nf(CFG.actualAc, CFG.actualAc % 1 ? 1 : 0)} кВт → ${c === "hv" ? "HV · Deye F16" : "LV-стек"}`
-        : `Вручну: ${c === "hv" ? "HV · Deye F16" : "LV-стек"}`;
-      if (PR && PR.altTotalUsd != null && PR.altClass) {
-        const d = PR.altTotalUsd - PR.estimatedTotalPriceUsd;
-        h += ` · ${PR.altClass.toUpperCase()} дав би ${nf(PR.altTotalUsd)} $ (${d > 0 ? "+" : ""}${nf(d)} $)`;
-      }
-    }
-    $("batClsHint").textContent = h;
-  }
   if (S.type === "bess") {
     $("heroPrice").textContent = CFG.UZ && CFG.UZ.qty ? nf(CFG.UZ.totalEur) + " €" : "—";
     $("heroSub").textContent = CFG.UZ && CFG.UZ.qty
