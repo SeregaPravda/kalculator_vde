@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201826">
+<link rel="stylesheet" href="css/app.css?v=202609201834">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -29,8 +29,8 @@
   <div class="hybonly hide"><label class="f">Ємність АКБ, кВт·год</label>
     <input type="number" id="fBatKwh" value="50" min="0" step="any">
     <div class="hint" id="batHint"></div></div>
-  <div class="hybonly hide"><label class="f">Тип АКБ<a href="#" id="batAuto" class="lnkAuto hide">авто</a></label>
-    <div class="seg" id="segBat"><button data-v="lv">LV · 51,2 В</button><button data-v="hv">HV-стек</button></div></div>
+  <div class="hybonly hide"><label class="f">АКБ — тип</label>
+    <select id="fBatModel"></select></div>
   <div><label class="f">Ціна в КП</label>
     <div class="seg" id="segVat"><button data-v="with" class="on">З ПДВ</button><button data-v="without">Без ПДВ</button></div>
     <div class="hint" id="vatHint">Матриця цін — з ПДВ. «Без ПДВ» ділить підсумок на 1,2.</div></div>
@@ -117,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201826"></script>
-<script src="js/auth.js?v=202609201826"></script>
-<script src="js/calc_engine.js?v=202609201826"></script>
-<script src="js/data.js?v=202609201826"></script>
-<script src="js/photo.js?v=202609201826"></script>
+<script src="js/config.js?v=202609201834"></script>
+<script src="js/auth.js?v=202609201834"></script>
+<script src="js/calc_engine.js?v=202609201834"></script>
+<script src="js/data.js?v=202609201834"></script>
+<script src="js/photo.js?v=202609201834"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -133,7 +133,8 @@ const vatLong = () => S.vat === "without"
 /* Фактичний клас АКБ: що повернув сервер, інакше вибір менеджера, інакше авто за інвертором */
 const batClass = () => (PR && PR.batteryClass) ? PR.batteryClass
   : (S.batCls !== "auto" ? S.batCls : (CFG && CFG.actualAc >= 50 ? "hv" : "lv"));
-const S = { type: "network", place: "roof", addUze: "no", vat: "with", batCls: "auto" };
+const S = { type: "network", place: "roof", addUze: "no", vat: "with", batCls: "auto", batModel: "" };
+let BATMODELS = [];   // каталог АКБ із цінами за штуку (ціни рахує сервер)
 let ME = null;            // профіль менеджера з Supabase
 let IS_ADMIN = false;
 
@@ -154,7 +155,28 @@ let manualInv = false;
 
 /* Ціни УЗЕ: view uze_catalog віддає вже КІНЦЕВУ ціну (з ПДВ і націнкою комерційної функції).
    Саму націнку менеджер не бачить — вона є лише в таблиці uze_prices для адміна. */
+/* Каталог АКБ: сервер віддає лише модель і ємність, ціни лишаються на сервері */
+async function loadBatteryModels() {
+  const { data, error } = await sb.rpc("battery_catalog");
+  BATMODELS = error ? [] : (data || []);
+  const sel = $("fBatModel");
+  sel.innerHTML =
+    '<option value="auto">Авто — за потужністю інвертора</option>' +
+    '<option value="lv">LV · 51,2 В — ставка за кВт·год</option>' +
+    '<option value="hv">HV-стек — ставка за кВт·год</option>' +
+    BATMODELS.map(m => `<option value="m:${esc(m.model_id)}">${esc(m.brand)} ${esc(m.model)} · ${nf(m.kwh, 2)} кВт·год</option>`).join("");
+  sel.value = S.batModel ? "m:" + S.batModel : S.batCls;
+  sel.onchange = () => {
+    const v = sel.value;
+    if (v.startsWith("m:")) { S.batModel = v.slice(2); S.batCls = "auto"; }
+    else { S.batModel = ""; S.batCls = v; }
+    run();
+  };
+}
+const curBatModel = () => S.batModel ? BATMODELS.find(m => m.model_id === S.batModel) : null;
+
 async function loadUzePrices() {
+
   const { data, error } = await sb.rpc("uze_catalog");
   if (error || !data || !data.length) { D.uze = []; return "Не вдалося завантажити ціни УЗЕ" + (error ? ": " + error.message : ""); }
   D.uze = data.map(u => {
@@ -204,8 +226,8 @@ function formState() {
 function restoreState(st) {
   if (!st || !st.S) return;
   Object.assign(S, st.S);
-  ["segType","segPlace","segUze","segVat","segBat"].forEach((id, i) => {
-    const key = ["type","place","addUze","vat","batCls"][i];
+  ["segType","segPlace","segUze","segVat"].forEach((id, i) => {
+    const key = ["type","place","addUze","vat"][i];
     $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === S[key]));
   });
   syncVisibility();
@@ -307,6 +329,7 @@ function quoteParams() {
     installed_dc_kwp: CFG.kwp, battery_kwh: CFG.BAT ? CFG.BAT.totalKwh : 0,
     inverter_ac_kw: CFG.actualAc,          // сегмент АКБ за замовчуванням: LV (<50 кВт) / HV (≥50 кВт)
     battery_class: S.batCls,               // auto | lv | hv — менеджер може задати вручну
+    battery_model: S.batModel || null,     // модель з каталогу: ціна за штуку замість ставки
     vat_mode: S.vat,                       // with | without
     uze_id: CFG.UZ && CFG.UZ.qty ? CFG.UZ.id : null,
     uze_qty: CFG.UZ && CFG.UZ.qty ? CFG.UZ.qty : null,
@@ -378,6 +401,17 @@ function run() {
     const kwh = Number($("fBatKwh").value) || 0;
     const backupTarget = Number($("fBackup").value) || actualAc;
     const rec = sizeHybridBattery(actualAc, backupTarget);
+    const bm = curBatModel();
+    if (bm && kwh > 0) {
+      /* Обрана конкретна модель: ємність кратна блоку, ціна рахується за штуки */
+      let units = Math.max(1, Math.ceil(kwh / Number(bm.kwh)));
+      if (bm.max_units && units > bm.max_units) units = bm.max_units;
+      const total = +(units * Number(bm.kwh)).toFixed(2);
+      BAT = { kwh, totalKwh: total, units, blockKwh: Number(bm.kwh),
+              modelName: `${bm.brand} ${bm.model}`, voltage: bm.voltage,
+              usableKwh: +(total * 0.9).toFixed(2), errors: [] };
+      $("batHint").innerHTML = `${units} × ${nf(bm.kwh, 2)} кВт·год · ${esc(bm.brand)} ${esc(bm.model)} · разом ${nf(total, 2)} кВт·год`;
+    } else {
     const mods = kwh > 0 ? Math.max(1, Math.round(kwh / 5.12)) : 0;
     const perCl = mods ? Math.ceil(mods / rec.clusters) : 0;
     const vCluster = +(perCl * 51.2).toFixed(1);
@@ -396,6 +430,7 @@ function run() {
       ? `${BAT.totalModules} модулів · стек ${nf(vCluster, 0)} В · резерв ${nf(BAT.backupPowerKw, 1)} кВт · ` +
         `для повного резерву ${nf(BAT.recommendedKwh, 1)} кВт·год`
       : "Вкажіть ємність";
+    }
   }
 
   /* ---- УЗЕ (ціни відкриті, рахується в браузері) ---- */
@@ -440,13 +475,6 @@ function render() {
   const pend = PRICE_PENDING;
   $("heroPrice").classList.toggle("pending", pend);
   /* Підказка під вибором класу АКБ: що застосовано і скільки коштувала б альтернатива */
-  /* Тип АКБ: підсвічуємо застосований варіант, на другому показуємо різницю в ціні */
-  if ($("segBat")) {
-    $("segBat").style.display = SRV_BAT ? "" : "none";
-    const cur = batClass();
-    $("segBat").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === cur));
-    $("batAuto").classList.toggle("hide", S.batCls === "auto");
-  }
   if (S.type === "bess") {
     $("heroPrice").textContent = CFG.UZ && CFG.UZ.qty ? nf(CFG.UZ.totalEur) + " €" : "—";
     $("heroSub").textContent = CFG.UZ && CFG.UZ.qty
@@ -514,7 +542,11 @@ function render() {
     ["Кількість інверторів", nf(R.inverterQuantity) + " шт × " + nf(R.inverterUnitAcKw, R.inverterUnitAcKw % 1 ? 1 : 0) + " кВт"],
     ["Потужність по інвертору", nf(R.inverterTotalAcKw, R.inverterTotalAcKw % 1 ? 1 : 0) + " кВт AC"],
     ["DC/AC ratio", nf(R.dcAcRatio, 2)]];
-  if (CFG.BAT) cfg.push(
+  if (CFG.BAT && CFG.BAT.modelName) cfg.push(
+    ["АКБ — модель", CFG.BAT.modelName],
+    ["АКБ — кількість", CFG.BAT.units + " шт × " + nf(CFG.BAT.blockKwh, 2) + " кВт·год"],
+    ["АКБ — ємність", nf(CFG.BAT.totalKwh, 2) + " кВт·год (корисних " + nf(CFG.BAT.usableKwh, 2) + ")"]);
+  else if (CFG.BAT) cfg.push(
     ["АКБ — конфігурація", CFG.BAT.clusters + " кластер(и) × " + CFG.BAT.modulesPerCluster + " модулів"],
     ["АКБ — напруга стека", nf(CFG.BAT.clusterVoltage, 0) + " В"],
     ["АКБ — ємність", nf(CFG.BAT.totalKwh, 2) + " кВт·год (корисних " + nf(CFG.BAT.usableKwh, 2) + ")"],
@@ -668,8 +700,9 @@ function buildOffer() {
     [`Інвертор ${D.invBrands.join(" · ")} потужністю ${nf(R.inverterUnitAcKw, R.inverterUnitAcKw % 1 ? 1 : 0)} кВт`,
      `${nf(R.inverterQuantity)} шт`]
   ];
-  if (hyb && CFG.BAT && CFG.BAT.totalKwh > 0) spec.push(
-    [`Акумуляторні батареї ${batClass() === "hv" ? "HV-стек (послідовне з'єднання + control box)" : D.batBrands.join(" · ") + " (LV, 51,2 В)"}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
+  if (hyb && CFG.BAT && CFG.BAT.totalKwh > 0) spec.push(CFG.BAT.modelName
+    ? [`Акумуляторні батареї ${CFG.BAT.modelName}`, `${CFG.BAT.units} шт · ${nf(CFG.BAT.totalKwh, 2)} кВт·год`]
+    : [`Акумуляторні батареї ${batClass() === "hv" ? "HV-стек (послідовне з'єднання + control box)" : D.batBrands.join(" · ") + " (LV, 51,2 В)"}`, `${nf(CFG.BAT.totalKwh, 1)} кВт·год`]);
   const included = [
     ["Монтажна конструкція для фотомодулів", "повний комплект"],
     ["Кабельні лінії DC", "повний комплект"],
@@ -906,11 +939,11 @@ $("fUzeKwh").addEventListener("input", () => { if (!manualUze) autoPickUze(); ru
   const a = await requireAuth(); if (!a) return;
   ME = a.profile; IS_ADMIN = ME.role === "admin";
   $("mgrLine").textContent = `${ME.full_name} · ${ME.position || ""} · ${ME.filial} · ${ME.phone || ""} · ${ME.email || a.session.user.email}`;
+  await loadBatteryModels();
   const uzeErr = await loadUzePrices();
   if (uzeErr) $("warnBox").insertAdjacentHTML("afterbegin", `<div class="alert warn">${esc(uzeErr)}</div>`);
   seg("segType", "type"); seg("segPlace", "place"); seg("segUze", "addUze");
-  segLite("segVat", "vat"); segLite("segBat", "batCls");
-  $("batAuto").onclick = ev => { ev.preventDefault(); S.batCls = "auto"; run(); };   // повернутись до автовибору
+  segLite("segVat", "vat");
   await loadFx();                       // курс ПриватБанку до першого розрахунку
   fillUze(); syncVisibility(); autoAc();
   loadHistory();
