@@ -176,3 +176,10 @@ table.edit input{padding:6px 8px;font-size:13px;max-width:140px}
 @media print{.nav{display:none!important}}
 
 input[readonly]{background:#f3f1ef;color:#6b6663;cursor:default}
+
+/* Перемикач типу АКБ: різниця в ціні дрібним написом на неактивному варіанті */
+#segBat button{display:inline-flex;align-items:baseline;justify-content:center;gap:6px}
+#segBat em{font-style:normal;font-size:11px;font-weight:normal;opacity:.65}
+#segBat em.save{color:#2F7A3E;opacity:1;font-weight:bold}
+.lnkAuto{margin-left:8px;font-size:10px;font-weight:bold;letter-spacing:.06em;color:var(--o);text-decoration:none;border-bottom:1px dotted var(--o)}
+.lnkAuto:hover{border-bottom-style:solid}

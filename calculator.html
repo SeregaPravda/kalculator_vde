@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201812">
+<link rel="stylesheet" href="css/app.css?v=202609201814">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -29,8 +29,8 @@
   <div class="hybonly hide"><label class="f">Ємність АКБ, кВт·год</label>
     <input type="number" id="fBatKwh" value="50" min="0" step="any">
     <div class="hint" id="batHint"></div></div>
-  <div class="hybonly hide"><label class="f">АКБ — тип</label>
-    <div class="seg" id="segBat"><button data-v="auto" class="on">Авто</button><button data-v="lv">LV-стек</button><button data-v="hv">Deye F16</button></div></div>
+  <div class="hybonly hide"><label class="f">Тип АКБ<a href="#" id="batAuto" class="lnkAuto hide">авто</a></label>
+    <div class="seg" id="segBat"><button data-v="lv">LV-стек<em></em></button><button data-v="hv">Deye F16<em></em></button></div></div>
   <div><label class="f">Ціна в КП</label>
     <div class="seg" id="segVat"><button data-v="with" class="on">З ПДВ</button><button data-v="without">Без ПДВ</button></div>
     <div class="hint" id="vatHint">Матриця цін — з ПДВ. «Без ПДВ» ділить підсумок на 1,2.</div></div>
@@ -117,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201812"></script>
-<script src="js/auth.js?v=202609201812"></script>
-<script src="js/calc_engine.js?v=202609201812"></script>
-<script src="js/data.js?v=202609201812"></script>
-<script src="js/photo.js?v=202609201812"></script>
+<script src="js/config.js?v=202609201814"></script>
+<script src="js/auth.js?v=202609201814"></script>
+<script src="js/calc_engine.js?v=202609201814"></script>
+<script src="js/data.js?v=202609201814"></script>
+<script src="js/photo.js?v=202609201814"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -440,7 +440,21 @@ function render() {
   const pend = PRICE_PENDING;
   $("heroPrice").classList.toggle("pending", pend);
   /* Підказка під вибором класу АКБ: що застосовано і скільки коштувала б альтернатива */
-  if ($("segBat")) $("segBat").style.display = SRV_BAT ? "" : "none";
+  /* Тип АКБ: підсвічуємо застосований варіант, на другому показуємо різницю в ціні */
+  if ($("segBat")) {
+    $("segBat").style.display = SRV_BAT ? "" : "none";
+    const cur = batClass();
+    const d = (PR && PR.altTotalUsd != null && PR.altClass) ? PR.altTotalUsd - PR.estimatedTotalPriceUsd : null;
+    $("segBat").querySelectorAll("button").forEach(b => {
+      const on = b.dataset.v === cur;
+      b.classList.toggle("on", on);
+      const tag = b.querySelector("em");
+      if (!tag) return;
+      if (on || d == null) { tag.textContent = ""; tag.className = ""; }
+      else { tag.textContent = (d > 0 ? "+" : "−") + nf(Math.abs(d)) + " $"; tag.className = d < 0 ? "save" : ""; }
+    });
+    $("batAuto").classList.toggle("hide", S.batCls === "auto");
+  }
   if (S.type === "bess") {
     $("heroPrice").textContent = CFG.UZ && CFG.UZ.qty ? nf(CFG.UZ.totalEur) + " €" : "—";
     $("heroSub").textContent = CFG.UZ && CFG.UZ.qty
@@ -904,6 +918,7 @@ $("fUzeKwh").addEventListener("input", () => { if (!manualUze) autoPickUze(); ru
   if (uzeErr) $("warnBox").insertAdjacentHTML("afterbegin", `<div class="alert warn">${esc(uzeErr)}</div>`);
   seg("segType", "type"); seg("segPlace", "place"); seg("segUze", "addUze");
   segLite("segVat", "vat"); segLite("segBat", "batCls");
+  $("batAuto").onclick = ev => { ev.preventDefault(); S.batCls = "auto"; run(); };   // повернутись до автовибору
   await loadFx();                       // курс ПриватБанку до першого розрахунку
   fillUze(); syncVisibility(); autoAc();
   loadHistory();
