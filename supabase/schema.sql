@@ -320,7 +320,24 @@ drop function if exists public.kp_stats(timestamptz, timestamptz);
 -- Статистика по менеджерах. Рахується ПО ОСТАННЬОМУ КП на кожного клієнта
 -- (повторні прорахунки того самого клієнта не псують суми й середній чек);
 -- calc_count — скільки всього прорахунків зробив менеджер за період.
-create or replace function public.kp_stats(date_from timestamptz default null, date_to timestamptz default null)
+-- Керівник філії бачить тільки менеджерів своєї філії; керівник з розвитку регіонів — усі
+create or replace function public.kp_scope_ok(target_filial text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case
+    when public.is_admin() then true
+    else exists (
+      select 1 from public.profiles me
+      where me.id = auth.uid()
+        and (me.role <> 'head'
+             or coalesce(me.position, '') ~* 'регіон'
+             or me.filial is not distinct from target_filial))
+  end;
+$$;
+revoke all on function public.kp_scope_ok(text) from public, anon;
+grant execute on function public.kp_scope_ok(text) to authenticated;
+
+create or replace function public.kp_stats
+(date_from timestamptz default null, date_to timestamptz default null)
 returns table (manager_id uuid, full_name text, filial text, kp_count bigint,
                sum_usd numeric, sum_uze_eur numeric, last_at timestamptz,
                avg_usd numeric, avg_kwp numeric, sum_kwp numeric, bess_count bigint, calc_count bigint)
@@ -347,7 +364,7 @@ language sql stable security definer set search_path = public as $$
   from public.profiles pr
   left join lastkp k on k.manager_id = pr.id
   left join allk a on a.mid = pr.id
-  where public.is_staff() and pr.role = 'manager'
+  where public.is_staff() and pr.role = 'manager' and public.kp_scope_ok(pr.filial)
   group by pr.id, pr.full_name, pr.filial
   order by count(k.id) desc, pr.full_name
 $$;
@@ -499,7 +516,11 @@ create policy battery_prices_head_read on public.battery_prices for select using
 drop policy if exists uze_prices_head_read on public.uze_prices;
 create policy uze_prices_head_read on public.uze_prices for select using (public.is_staff());
 drop policy if exists kp_log_staff_select on public.kp_log;
-create policy kp_log_staff_select on public.kp_log for select using (manager_id = auth.uid() or public.is_staff());
+create policy kp_log_staff_select on public.kp_log for select using (
+  manager_id = auth.uid()
+  or (public.is_staff()
+      and public.kp_scope_ok((select p.filial from public.profiles p where p.id = kp_log.manager_id)))
+);
 
 insert into public.pending_profiles (email, full_name, phone, filial, position, role) values
   ('roman.stetsko@pa.ua',        'Стецько Роман',        '+380674308399', 'Львів',        'Керівник філії',               'head'),
