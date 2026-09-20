@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Ціни</title>
-<link rel="stylesheet" href="css/app.css?v=202609201838">
+<link rel="stylesheet" href="css/app.css?v=202609201840">
 </head><body>
 <div id="nav"></div>
 <div class="wrap">
@@ -22,7 +22,12 @@
    <div class="disc" style="margin-top:14px">Ставки комерційної функції від 03.09.2026: LV 340 · HV 250 $/кВт·год.</div>
   </div>
  </div>
+ <div class="card"><h2>Моделі АКБ, $ за штуку</h2>
+  <div class="muted" style="margin-bottom:8px">Для цих моделей накопичення в КП рахується за штуками, а не ставкою за кВт·год: кількість блоків × «Ціна для КП». Ставка $/кВт·год лишається для конфігурацій, де модель не обрана. Менеджер бачить лише підсумок, ні закупівельної ціни, ні націнки.</div>
+  <div style="overflow-x:auto"><table class="edit" id="batTblM"><thead><tr><th>Модель</th><th class="num">кВт·год</th><th>Клас</th><th class="num">Ціна постачальника, $</th><th>ПДВ</th><th class="num">Націнка, ×</th><th class="num">Макс. шт</th><th>Джерело ціни</th><th class="num">Ціна для КП, $</th><th class="num">$/кВт·год</th><th>Оновлено</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
+ </div>
  <div class="card"><h2>Системи накопичення (УЗЕ), € за шафу</h2>
+
   <div class="muted" style="margin-bottom:8px">«Ціна постачальника» — як у рахунку; якщо ПДВ не включено, додається 20 %. «Націнка» — коефіцієнт комерційної функції (1,10 = +10 %). Менеджери бачать лише «Ціну для КП» — ні закупівельну ціну, ні націнку. Неактивні моделі зникають зі списку в калькуляторі.</div>
   <div style="overflow-x:auto"><table class="edit" id="uzeTbl"><thead><tr><th>Модель</th><th class="num">кВт / кВт·год</th><th class="num">Ціна постачальника, €</th><th>ПДВ</th><th class="num">Націнка, ×</th><th>Умови постачання</th><th>Гарантія</th><th>Джерело ціни</th><th class="num">Ціна для КП, €</th><th class="num">€/кВт·год</th><th>Оновлено</th><th>Акт.</th></tr></thead><tbody></tbody></table></div>
  </div>
@@ -31,16 +36,35 @@
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201838"></script>
-<script src="js/auth.js?v=202609201838"></script>
+<script src="js/config.js?v=202609201840"></script>
+<script src="js/auth.js?v=202609201840"></script>
 <script>
 const TYPE = { network: "Мережева", hybrid: "Гібридна" }, PLACE = { roof: "Дах", ground: "Земля" },
       SEG = { small: "до 30", medium: "30–100", large: "100–300", xl: "від 300" },
       BSEG = { lv: "LV — гібридний інвертор до 50 кВт", hv: "HV — гібридний інвертор від 50 кВт (послідовний стек + control box)" };
 const ORDER = { network: 0, hybrid: 1, small: 0, medium: 1, large: 2, xl: 3, lv: 0, hv: 1, roof: 0, ground: 1 };
-let PV = [], BAT = [], UZE = [], ME = null;
+let PV = [], BAT = [], UZE = [], BATM = [], ME = null;
+
+function renderBatModels() {
+  document.querySelector("#batTblM tbody").innerHTML = BATM.map(b => {
+    const withVat = b.vat_in ? Number(b.price_usd) : Number(b.price_usd) * 1.2;
+    const final = withVat * Number(b.markup_k || 1);
+    return `<tr data-bm="${esc(b.model_id)}">
+    <td><b>${esc(b.brand)}</b><br><span class="muted">${esc(b.model)}</span></td>
+    <td class="num muted">${nf(b.kwh, 2)}</td>
+    <td class="muted">${esc((b.voltage || "").toUpperCase())}</td>
+    <td class="num"><input type="number" step="0.01" min="0" data-f="price_usd" value="${b.price_usd}"></td>
+    <td><select data-f="vat_in"><option value="false" ${!b.vat_in ? "selected" : ""}>без ПДВ</option><option value="true" ${b.vat_in ? "selected" : ""}>з ПДВ</option></select></td>
+    <td class="num"><input type="number" step="0.01" min="1" data-f="markup_k" value="${b.markup_k || 1}"></td>
+    <td class="num"><input type="number" step="1" min="1" data-f="max_units" value="${b.max_units || 1}"></td>
+    <td><input data-f="source" value="${esc(b.source || "")}" placeholder="рахунок, дата"></td>
+    <td class="num"><b>${nf(final)}</b></td><td class="num">${nf(final / Number(b.kwh), 1)}</td>
+    <td class="muted">${b.updated_at ? fmtDate(b.updated_at) : "—"}</td>
+    <td><input type="checkbox" data-f="active" ${b.active ? "checked" : ""} style="width:auto"></td></tr>`; }).join("");
+}
 
 function renderUze() {
+
   document.querySelector("#uzeTbl tbody").innerHTML = UZE.map(u => {
     const withVat = u.vat_in ? Number(u.price_eur) : Number(u.price_eur) * 1.2;
     const final = withVat * Number(u.markup_k || 1);
@@ -64,6 +88,8 @@ async function load() {
               .order("updated_at", { ascending: false, nullsFirst: false }).order("sort");   // найновіші зверху
   if (a.error || b.error || u.error) { msg((a.error || b.error || u.error).message, true); return; }
   UZE = u.data; renderUze();
+  const bm = await sb.from("battery_models").select("*").order("sort");
+  BATM = bm.error ? [] : bm.data; renderBatModels();
   PV = a.data.sort((x, y) => ORDER[x.system_type] - ORDER[y.system_type] || ORDER[x.power_segment] - ORDER[y.power_segment] || ORDER[x.placement] - ORDER[y.placement]);
   BAT = b.data.sort((x, y) => ORDER[x.capacity_segment] - ORDER[y.capacity_segment]);
   document.querySelector("#pvTbl tbody").innerHTML = PV.map(r => `<tr>
@@ -96,7 +122,24 @@ async function save() {
     const { error } = await sb.from("battery_prices").update({ rate_usd_per_kwh: v, updated_at: now, updated_by: ME.id }).eq("id", row.id);
     if (error) errs.push(error.message);
   }
+  for (const tr of document.querySelectorAll("#batTblM tbody tr")) {
+    const row = BATM.find(r => r.model_id === tr.dataset.bm), upd = {};
+    tr.querySelectorAll("[data-f]").forEach(el => {
+      const f = el.dataset.f;
+      const num = (f === "price_usd" || f === "markup_k" || f === "max_units");
+      const v = f === "active" ? el.checked : f === "vat_in" ? el.value === "true" : num ? Number(el.value) : el.value;
+      const cur = num ? Number(row[f]) : (row[f] == null ? "" : row[f]);
+      if (v !== cur) upd[f] = v;
+    });
+    if (!Object.keys(upd).length) continue;
+    if ("price_usd" in upd && !(upd.price_usd > 0)) { errs.push("Ціна АКБ має бути > 0"); continue; }
+    if ("markup_k" in upd && !(upd.markup_k >= 1)) { errs.push("Націнка АКБ має бути ≥ 1,00"); continue; }
+    upd.updated_at = now; upd.updated_by = ME.id;
+    const { error } = await sb.from("battery_models").update(upd).eq("model_id", row.model_id);
+    if (error) errs.push(error.message);
+  }
   for (const tr of document.querySelectorAll("#uzeTbl tbody tr")) {
+
     const row = UZE.find(r => r.uze_id === tr.dataset.uze), upd = {};
     tr.querySelectorAll("[data-f]").forEach(el => {
       const f = el.dataset.f;
