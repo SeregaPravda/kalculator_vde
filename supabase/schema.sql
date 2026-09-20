@@ -215,13 +215,18 @@ declare
   pl         text := p->>'placement';
   kwp        numeric := coalesce((p->>'installed_dc_kwp')::numeric, 0);
   kwh        numeric := coalesce((p->>'battery_kwh')::numeric, 0);
-  inv_kw     numeric := coalesce((p->>'inverter_ac_kw')::numeric, 0);   -- потужність гібридного інвертора → сегмент АКБ
-  pcat       text; bcat text;
-  rate_a     numeric := 0; rate_b numeric := 0;
-  pv_usd     numeric := 0; bat_usd numeric := 0; total_usd numeric := 0;
+  inv_kw     numeric := coalesce((p->>'inverter_ac_kw')::numeric, 0);
+  bcls       text := lower(coalesce(nullif(p->>'battery_class', ''), 'auto'));
+  vatm       text := lower(coalesce(nullif(p->>'vat_mode', ''), 'with'));
+  pcat       text; bcat text; balt text;
+  rate_a     numeric := 0; rate_b numeric := 0; rate_alt numeric := 0;
+  pv_usd     numeric := 0; bat_usd numeric := 0;
+  gross      numeric := 0; alt_gross numeric := null;
+  total_usd  numeric := 0; alt_usd numeric := null;
   u_id       text := p->>'uze_id';
   u_qty      integer := coalesce((p->>'uze_qty')::integer, 0);
   u_total    numeric := (p->>'uze_total_eur')::numeric;
+  u_log      numeric;
   kp_no      text := nullif(trim(coalesce(p->>'kp_number', '')), '');
   res        jsonb;
 begin
@@ -229,6 +234,8 @@ begin
     raise exception 'not authenticated' using errcode = '42501';
   end if;
   adm := public.is_admin();
+  if bcls not in ('auto', 'lv', 'hv') then bcls := 'auto'; end if;
+  if vatm not in ('with', 'without')  then vatm := 'with'; end if;
 
   -- ---- СЕС: PV + накопичення
   if st in ('network','hybrid') and kwp > 0 then
@@ -244,19 +251,30 @@ begin
     pv_usd := kwp * rate_a;
 
     if st = 'hybrid' and kwh > 0 then
-      bcat := case when inv_kw < 50 then 'lv' else 'hv' end;
+      bcat := case when bcls in ('lv','hv') then bcls
+                   when inv_kw < 50 then 'lv' else 'hv' end;
+      balt := case when bcat = 'lv' then 'hv' else 'lv' end;
       select rate_usd_per_kwh into rate_b from public.battery_prices where capacity_segment = bcat;
       if rate_b is null then
         raise exception 'no battery price for %', bcat;
       end if;
       bat_usd := kwh * rate_b;
+      select rate_usd_per_kwh into rate_alt from public.battery_prices where capacity_segment = balt;
+      if rate_alt is not null then alt_gross := round(pv_usd + kwh * rate_alt); end if;
     else
       kwh := 0;
     end if;
-    total_usd := round(pv_usd + bat_usd);
+    gross := round(pv_usd + bat_usd);
   else
     kwp := 0; kwh := 0;
   end if;
+
+  total_usd := case when vatm = 'without' then round(gross / 1.2) else gross end;
+  alt_usd   := case when alt_gross is null then null
+                    when vatm = 'without' then round(alt_gross / 1.2) else alt_gross end;
+  -- УЗЕ приходить із клієнта вже у вибраному режимі ПДВ; у журнал нормалізуємо до «з ПДВ»
+  u_log     := case when u_total is null then null
+                    when vatm = 'without' then round(u_total * 1.2, 2) else u_total end;
 
   -- ---- лог
   if do_log then
@@ -265,14 +283,21 @@ begin
                                total_price_usd, uze_id, uze_qty, uze_total_eur,
                                client_name, city, kp_number, params)
     values (uid, coalesce(st, '?'), pl, nullif(kwp, 0), nullif(kwh, 0),
-            total_usd, u_id, nullif(u_qty, 0), u_total,
-            p->>'client_name', p->>'city', kp_no, p->'params');
+            gross, u_id, nullif(u_qty, 0), u_log,
+            p->>'client_name', p->>'city', kp_no,
+            coalesce(p->'params', '{}'::jsonb) || jsonb_build_object(
+              'vat_mode', vatm, 'battery_class', coalesce(bcat, bcls), 'quoted_total_usd', total_usd));
   end if;
 
   res := jsonb_build_object(
     'total_price_usd', total_usd,
+    'total_with_vat',  gross,
     'pv_kwp', kwp, 'battery_kwh', kwh,
-    'vat_included', true,
+    'vat_included', (vatm = 'with'),
+    'vat_mode', vatm,
+    'battery_segment', bcat,
+    'alt_battery_segment', balt,
+    'alt_total_usd', alt_usd,
     'is_admin', adm,
     'logged', do_log,
     'kp_number', kp_no
