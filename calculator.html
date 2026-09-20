@@ -2,7 +2,7 @@
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Промавтоматика · Калькулятор індикативних КП</title>
-<link rel="stylesheet" href="css/app.css?v=202609201834">
+<link rel="stylesheet" href="css/app.css?v=202609201838">
 </head><body>
 <div id="nav"></div>
 <div id="app"><div class="wrap">
@@ -117,11 +117,11 @@
 <div class="tip" id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js?v=202609201834"></script>
-<script src="js/auth.js?v=202609201834"></script>
-<script src="js/calc_engine.js?v=202609201834"></script>
-<script src="js/data.js?v=202609201834"></script>
-<script src="js/photo.js?v=202609201834"></script>
+<script src="js/config.js?v=202609201838"></script>
+<script src="js/auth.js?v=202609201838"></script>
+<script src="js/calc_engine.js?v=202609201838"></script>
+<script src="js/data.js?v=202609201838"></script>
+<script src="js/photo.js?v=202609201838"></script>
 <script>
 const $ = i => document.getElementById(i);
 /* ПДВ: матриця цін і ціни УЗЕ зберігаються з ПДВ; «без ПДВ» ділить підсумок на 1,2 */
@@ -516,7 +516,7 @@ function render() {
       W.push("Умови постачання для " + CFG.UZ.brand + " не підтверджені. " +
         "Незрозуміло, чи входить логістика в ціну.");
   }
-  if (CFG.BAT) {
+  if (CFG.BAT && !CFG.BAT.modelName) {   /* попередження про резерв стосуються LV-стека BOS-G */
     if (CFG.BAT.totalKwh > 0 && CFG.BAT.backupPowerKw < CFG.BAT.targetBackupKw * 0.98)
       W.unshift("Батарея віддасть при зникненні мережі лише " + nf(CFG.BAT.backupPowerKw, 1) +
         " кВт замість потрібних " + nf(CFG.BAT.targetBackupKw, 0) + " кВт. Причина: стек " +
