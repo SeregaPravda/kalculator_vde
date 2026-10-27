@@ -1,22 +1,12 @@
 {
   "info": {
-    "name": "Промавтоматика · 1С → Supabase",
-    "description": "Перевірка інтеграції: логін технічного акаунта, надсилання документа, ідемпотентність, оновлення токена і негативний тест. Перед запуском заповніть змінну password у вкладці Variables.",
+    "name": "Промавтоматика · 1С → API документів",
+    "description": "Перевірка інтеграції: логін, надсилання документа, повторне надсилання тим самим номером, перевірка статусу, відмова без токена. Перед запуском імпортуйте оточення і впишіть пароль у змінну password.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [
-    { "key": "base_url", "value": "https://ohnghdnixulnvrvcapgf.supabase.co", "type": "string" },
-    { "key": "apikey", "value": "sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc", "type": "string" },
-    { "key": "email", "value": "integration.1c@pa.ua", "type": "string" },
-    { "key": "password", "value": "", "type": "string" },
-    { "key": "access_token", "value": "", "type": "string" },
-    { "key": "refresh_token", "value": "", "type": "string" },
-    { "key": "doc_id", "value": "TEST-001", "type": "string" },
-    { "key": "inbox_id", "value": "", "type": "string" }
-  ],
   "item": [
     {
-      "name": "1. Логін технічного акаунта",
+      "name": "1. Логін",
       "request": {
         "method": "POST",
         "header": [
@@ -29,10 +19,7 @@
           "path": ["auth", "v1", "token"],
           "query": [{ "key": "grant_type", "value": "password" }]
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
-        }
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
       },
       "event": [
         {
@@ -43,8 +30,8 @@
               "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
               "var j = pm.response.json();",
               "pm.test('Прийшов access_token', function () { pm.expect(j.access_token).to.be.a('string'); });",
-              "pm.collectionVariables.set('access_token', j.access_token);",
-              "pm.collectionVariables.set('refresh_token', j.refresh_token);",
+              "pm.environment.set('access_token', j.access_token);",
+              "pm.environment.set('refresh_token', j.refresh_token);",
               "console.log('Токен діє секунд: ' + j.expires_in);"
             ]
           }
@@ -61,13 +48,13 @@
           { "key": "Content-Type", "value": "application/json" }
         ],
         "url": {
-          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c_doc",
           "host": ["{{base_url}}"],
-          "path": ["rest", "v1", "rpc", "ingest_1c"]
+          "path": ["rest", "v1", "rpc", "ingest_1c_doc"]
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"{{doc_id}}\",\n  \"p_payload\": {\n    \"номер\": \"{{doc_id}}\",\n    \"дата\": \"2026-10-27\",\n    \"контрагент\": \"ТОВ «Приклад»\",\n    \"позиції\": [\n      {\n        \"найменування\": \"Акумуляторна батарея DEYE SE-F16-С LiFePO4 LV 51.2V 314Ah 16kWh\",\n        \"кількість\": 1,\n        \"одиниця\": \"шт\",\n        \"ціна\": 94210.5,\n        \"сума\": 94210.5\n      },\n      {\n        \"найменування\": \"Інвертор гібридний 6 кВт 1ф SUN-6K-SG05LP1-EU DEYE\",\n        \"кількість\": 1,\n        \"одиниця\": \"шт\",\n        \"ціна\": 43440,\n        \"сума\": 43440\n      }\n    ],\n    \"разом\": 137650.5,\n    \"валюта\": \"UAH\"\n  }\n}"
+          "raw": "{\n  \"p_payload\": {\n    \"doc_id\": \"{{doc_id}}\",\n    \"doc_type\": \"spec\",\n    \"doc_date\": \"2026-10-27\",\n    \"counterparty\": \"ТОВ «Приклад»\",\n    \"manager\": \"Вельгус\",\n    \"total\": 137650.50,\n    \"currency\": \"UAH\",\n    \"items\": [\n      {\n        \"line_no\": 1,\n        \"item_code\": \"BAT-SE-F16\",\n        \"item_name\": \"Акумуляторна батарея DEYE SE-F16-С LiFePO4 LV 51.2V 314Ah 16kWh\",\n        \"unit\": \"шт\",\n        \"qty\": 1,\n        \"price\": 94210.50,\n        \"amount\": 94210.50\n      },\n      {\n        \"line_no\": 2,\n        \"item_code\": \"INV-SUN6K\",\n        \"item_name\": \"Інвертор гібридний 6 кВт SUN-6K-SG05LP1-EU DEYE\",\n        \"unit\": \"шт\",\n        \"qty\": 1,\n        \"price\": 43440.00,\n        \"amount\": 43440.00\n      }\n    ]\n  }\n}"
         }
       },
       "event": [
@@ -79,16 +66,15 @@
               "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
               "var j = pm.response.json();",
               "pm.test('ok = true', function () { pm.expect(j.ok).to.eql(true); });",
-              "pm.test('Повернувся id запису', function () { pm.expect(j.id).to.be.a('number'); });",
-              "pm.collectionVariables.set('inbox_id', j.id);",
-              "console.log('Документ прийнято, id = ' + j.id);"
+              "pm.test('Прийнято 2 позиції', function () { pm.expect(j.items).to.eql(2); });",
+              "console.log('Документ ' + j.doc_id + ': ' + j.action + ', позицій ' + j.items);"
             ]
           }
         }
       ]
     },
     {
-      "name": "3. Повторне надсилання того самого документа",
+      "name": "3. Повторне надсилання того самого номера",
       "request": {
         "method": "POST",
         "header": [
@@ -97,13 +83,13 @@
           { "key": "Content-Type", "value": "application/json" }
         ],
         "url": {
-          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c_doc",
           "host": ["{{base_url}}"],
-          "path": ["rest", "v1", "rpc", "ingest_1c"]
+          "path": ["rest", "v1", "rpc", "ingest_1c_doc"]
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"{{doc_id}}\",\n  \"p_payload\": {\n    \"номер\": \"{{doc_id}}\",\n    \"дата\": \"2026-10-27\",\n    \"контрагент\": \"ТОВ «Приклад»\",\n    \"примітка\": \"той самий документ, виправлена сума\",\n    \"разом\": 137650.5,\n    \"валюта\": \"UAH\"\n  }\n}"
+          "raw": "{\n  \"p_payload\": {\n    \"doc_id\": \"{{doc_id}}\",\n    \"doc_type\": \"spec\",\n    \"counterparty\": \"ТОВ «Приклад»\",\n    \"note\": \"виправлена версія, одна позиція\",\n    \"items\": [\n      {\n        \"item_code\": \"BAT-SE-F16\",\n        \"item_name\": \"Акумуляторна батарея DEYE SE-F16-С 16kWh\",\n        \"unit\": \"шт\",\n        \"qty\": 2,\n        \"price\": 94210.50,\n        \"amount\": 188421.00\n      }\n    ]\n  }\n}"
         }
       },
       "event": [
@@ -114,32 +100,28 @@
             "exec": [
               "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
               "var j = pm.response.json();",
-              "pm.test('Дубль не створився: той самий id', function () {",
-              "  pm.expect(String(j.id)).to.eql(String(pm.collectionVariables.get('inbox_id')));",
-              "});"
+              "pm.test('Документ оновлено, а не задвоєно', function () { pm.expect(j.action).to.eql('updated'); });",
+              "pm.test('Позиції перезаписані: лишилась одна', function () { pm.expect(j.items).to.eql(1); });"
             ]
           }
         }
       ]
     },
     {
-      "name": "4. Оновити токен",
+      "name": "4. Перевірити статус документа",
       "request": {
         "method": "POST",
         "header": [
           { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
           { "key": "Content-Type", "value": "application/json" }
         ],
         "url": {
-          "raw": "{{base_url}}/auth/v1/token?grant_type=refresh_token",
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c_status",
           "host": ["{{base_url}}"],
-          "path": ["auth", "v1", "token"],
-          "query": [{ "key": "grant_type", "value": "refresh_token" }]
+          "path": ["rest", "v1", "rpc", "ingest_1c_status"]
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
-        }
+        "body": { "mode": "raw", "raw": "{\n  \"p_doc_id\": \"{{doc_id}}\"\n}" }
       },
       "event": [
         {
@@ -149,15 +131,44 @@
             "exec": [
               "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
               "var j = pm.response.json();",
-              "pm.collectionVariables.set('access_token', j.access_token);",
-              "pm.collectionVariables.set('refresh_token', j.refresh_token);"
+              "pm.test('Документ знайдено', function () { pm.expect(j.found).to.eql(true); });",
+              "pm.test('Позицій одна', function () { pm.expect(j.items).to.eql(1); });"
             ]
           }
         }
       ]
     },
     {
-      "name": "5. Без токена має бути відмова",
+      "name": "5. Помилка: не вказано doc_id",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c_doc",
+          "host": ["{{base_url}}"],
+          "path": ["rest", "v1", "rpc", "ingest_1c_doc"]
+        },
+        "body": { "mode": "raw", "raw": "{\n  \"p_payload\": { \"doc_type\": \"spec\", \"items\": [] }\n}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Запит відхилено', function () { pm.expect(pm.response.code).to.be.above(399); });",
+              "pm.test('Зрозуміла причина', function () { pm.expect(pm.response.text()).to.include('doc_id'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Без токена має бути відмова",
       "request": {
         "method": "POST",
         "header": [
@@ -165,14 +176,11 @@
           { "key": "Content-Type", "value": "application/json" }
         ],
         "url": {
-          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c_doc",
           "host": ["{{base_url}}"],
-          "path": ["rest", "v1", "rpc", "ingest_1c"]
+          "path": ["rest", "v1", "rpc", "ingest_1c_doc"]
         },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"NO-TOKEN\",\n  \"p_payload\": { \"a\": 1 }\n}"
-        }
+        "body": { "mode": "raw", "raw": "{\n  \"p_payload\": { \"doc_id\": \"NO-TOKEN\", \"items\": [] }\n}" }
       },
       "event": [
         {

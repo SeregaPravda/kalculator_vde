@@ -1,0 +1,13 @@
+{
+  "name": "Промавтоматика · 1С інтеграція",
+  "values": [
+    { "key": "base_url", "value": "https://ohnghdnixulnvrvcapgf.supabase.co", "type": "default", "enabled": true },
+    { "key": "apikey", "value": "sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc", "type": "default", "enabled": true },
+    { "key": "email", "value": "integration.1c@pa.ua", "type": "default", "enabled": true },
+    { "key": "password", "value": "", "type": "secret", "enabled": true },
+    { "key": "doc_id", "value": "TEST-0001", "type": "default", "enabled": true },
+    { "key": "access_token", "value": "", "type": "secret", "enabled": true },
+    { "key": "refresh_token", "value": "", "type": "secret", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}
