@@ -1,38 +1,29 @@
 -- ============================================================================
--- Склад з 1С: номенклатура, залишки, ціни (27.10.2026)
+-- Склад з 1С: номенклатура, залишки, собівартість (27.10.2026)
 --
--- Відмінність від документів: тут не подія, а стан. Склад вивантажується
--- повністю або частково і регулярно оновлюється.
+-- Таблиця stock_1c уже існувала, тому структуру не міняємо, лише додаємо
+-- три службові колонки для логіки оновлення. Ключ лишається складений:
+-- (item_code, warehouse) — одна позиція унікальна в межах складу.
 --
--- Як це працює:
---   · вивантаження йде пачками (chunk 1..chunks_total), бо одним запитом
---     кілька тисяч позицій не влазять: ліміт 2 МБ на запит;
---   · усі пачки одного вивантаження позначені спільним sync_id;
---   · режим 'full' = повний знімок складу. Після останньої пачки позиції,
---     яких у знімку не було, автоматично гасяться: active = false, qty = 0.
---     Нічого не видаляється, історія лишається;
---   · режим 'delta' = часткове оновлення, чіпає лише передані позиції.
+-- Як працює оновлення:
+--   · усі позиції одного вивантаження позначені спільним sync_id;
+--   · режим 'full' = повний знімок. Після останньої пачки позиції, яких
+--     у знімку не було, гасяться: active = false, qty = 0. Нічого не
+--     видаляється, історія лишається;
+--   · режим 'delta' = часткове оновлення, чіпає лише передані позиції;
+--   · до 2000 позицій в одному запиті. Для складу на 1000 позицій це один
+--     запит, пачки не потрібні.
 -- ============================================================================
 
--- ---- 1. Номенклатура -----------------------------------------------------
-create table if not exists public.stock_1c (
-  item_code   text primary key,                -- код номенклатури в 1С
-  item_name   text not null,
-  article     text,
-  group_name  text,                            -- група або папка в 1С
-  unit        text,
-  qty         numeric(14,3) not null default 0,
-  price       numeric(14,2),
-  currency    text not null default 'UAH',
-  vendor      text,
-  active      boolean not null default true,
-  last_sync   text,                            -- sync_id останнього вивантаження
-  raw         jsonb,
-  updated_at  timestamptz not null default now()
-);
-create index if not exists stock_1c_group_idx  on public.stock_1c (group_name);
-create index if not exists stock_1c_active_idx on public.stock_1c (active, item_name);
-create index if not exists stock_1c_name_trgm  on public.stock_1c (lower(item_name) text_pattern_ops);
+-- ---- 1. Службові колонки до наявної таблиці -----------------------------
+alter table public.stock_1c add column if not exists active    boolean not null default true;
+alter table public.stock_1c add column if not exists last_sync text;
+alter table public.stock_1c add column if not exists raw       jsonb;
+alter table public.stock_1c add column if not exists price     numeric(14,2);   -- ціна з 1С, окремо від собівартості
+alter table public.stock_1c add column if not exists currency  text not null default 'UAH';
+
+create index if not exists stock_1c_active_idx   on public.stock_1c (active, item_name);
+create index if not exists stock_1c_category_idx on public.stock_1c (category);
 
 -- ---- 2. Журнал вивантажень ----------------------------------------------
 create table if not exists public.stock_1c_sync (
@@ -50,7 +41,7 @@ create table if not exists public.stock_1c_sync (
 alter table public.stock_1c      enable row level security;
 alter table public.stock_1c_sync enable row level security;
 
--- Поки що склад бачить тільки адмін: у ньому можуть бути закупівельні ціни.
+-- Склад бачить лише адмін: у ньому собівартість.
 drop policy if exists stock_1c_admin on public.stock_1c;
 create policy stock_1c_admin on public.stock_1c for all
   using (public.is_admin()) with check (public.is_admin());
@@ -58,7 +49,7 @@ drop policy if exists stock_1c_sync_admin on public.stock_1c_sync;
 create policy stock_1c_sync_admin on public.stock_1c_sync for all
   using (public.is_admin()) with check (public.is_admin());
 
--- ---- 3. Приймання пачки --------------------------------------------------
+-- ---- 3. Приймання вивантаження ------------------------------------------
 create or replace function public.ingest_1c_stock(p_payload jsonb)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -90,11 +81,11 @@ begin
     raise exception 'payload too large (max 2 MB), send fewer items per chunk';
   end if;
 
-  v_sync  := nullif(trim(coalesce(p_payload->>'sync_id', '')), '');
+  v_sync := nullif(trim(coalesce(p_payload->>'sync_id', '')), '');
   if v_sync is null then
     raise exception 'sync_id is required';
   end if;
-  v_mode  := lower(coalesce(nullif(trim(coalesce(p_payload->>'mode','')), ''), 'full'));
+  v_mode := lower(coalesce(nullif(trim(coalesce(p_payload->>'mode','')), ''), 'full'));
   if v_mode not in ('full','delta') then
     raise exception 'mode must be full or delta';
   end if;
@@ -115,38 +106,40 @@ begin
   for it in select * from jsonb_array_elements(v_items) loop
     i := i + 1;
     if nullif(trim(coalesce(it->>'item_code','')), '') is null then
-      raise exception 'item_code is required in item % of chunk %', i, v_chunk;
+      raise exception 'item_code is required in item %', i;
     end if;
     if nullif(trim(coalesce(it->>'item_name','')), '') is null then
-      raise exception 'item_name is required in item % of chunk %', i, v_chunk;
+      raise exception 'item_name is required in item %', i;
     end if;
-    insert into public.stock_1c (item_code, item_name, article, group_name, unit,
-                                 qty, price, currency, vendor, active, last_sync, raw, updated_at)
+    insert into public.stock_1c (item_code, item_name, category, power_kw, qty, unit,
+                                 warehouse, price, currency, cost_uah, active, last_sync, raw, synced_at)
     values (it->>'item_code', it->>'item_name',
-            nullif(it->>'article',''), nullif(it->>'group_name',''), nullif(it->>'unit',''),
+            nullif(it->>'category',''),
+            nullif(it->>'power_kw','')::numeric,
             coalesce(nullif(it->>'qty','')::numeric, 0),
+            nullif(it->>'unit',''),
+            coalesce(nullif(trim(coalesce(it->>'warehouse','')), ''), 'основний'),
             nullif(it->>'price','')::numeric,
             coalesce(nullif(it->>'currency',''), 'UAH'),
-            nullif(it->>'vendor',''),
+            nullif(it->>'cost_uah','')::numeric,
             true, v_sync, it, now())
-    on conflict (item_code) do update set
-      item_name = excluded.item_name, article = excluded.article,
-      group_name = excluded.group_name, unit = excluded.unit,
-      qty = excluded.qty, price = excluded.price, currency = excluded.currency,
-      vendor = excluded.vendor, active = true, last_sync = excluded.last_sync,
-      raw = excluded.raw, updated_at = now();
+    on conflict (item_code, warehouse) do update set
+      item_name = excluded.item_name, category = excluded.category,
+      power_kw = excluded.power_kw, qty = excluded.qty, unit = excluded.unit,
+      price = excluded.price, currency = excluded.currency,
+      cost_uah = excluded.cost_uah, active = true, last_sync = excluded.last_sync,
+      raw = excluded.raw, synced_at = now();
     n_items := n_items + 1;
   end loop;
 
   update public.stock_1c_sync
-     set chunks_done = chunks_done + 1,
-         items_received = items_received + n_items
+     set chunks_done = chunks_done + 1, items_received = items_received + n_items
    where sync_id = v_sync;
 
   -- остання пачка повного знімка: гасимо те, чого в ньому не було
   if v_mode = 'full' and v_chunk >= v_total then
     update public.stock_1c
-       set active = false, qty = 0, updated_at = now()
+       set active = false, qty = 0, synced_at = now()
      where active and last_sync is distinct from v_sync;
     get diagnostics n_off = row_count;
     update public.stock_1c_sync
