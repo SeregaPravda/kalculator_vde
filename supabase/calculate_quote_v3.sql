@@ -38,6 +38,10 @@ begin
     raise exception 'not authenticated' using errcode = '42501';
   end if;
   adm := public.is_admin();
+  -- технічний акаунт 1С не має доступу до розрахунку цін
+  if exists (select 1 from public.profiles where id = uid and role = 'service') then
+    raise exception 'service account may not use the calculator' using errcode = '42501';
+  end if;
   if bcls not in ('auto', 'lv', 'hv') then bcls := 'auto'; end if;
   if vatm not in ('with', 'without')  then vatm := 'with'; end if;
 

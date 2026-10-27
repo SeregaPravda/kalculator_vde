@@ -34,6 +34,11 @@ async function requireAuth(role) {
     document.getElementById("lo").onclick = async e => { e.preventDefault(); try { ["kp_html","kp_num","kp_client"].forEach(k => localStorage.removeItem(k)); } catch (x) {} await sb.auth.signOut(); location.replace("index.html"); };
     return null;
   }
+  if (a.profile.role === "service") {   // технічний акаунт інтеграції — у вебінтерфейс не пускаємо
+    try { await sb.auth.signOut(); } catch (e) {}
+    document.body.innerHTML = '<div class="wrap"><div class="alert warn">Це технічний акаунт інтеграції. Вхід у калькулятор для нього закритий.</div></div>';
+    return null;
+  }
   if (role === "admin" && a.profile.role !== "admin") { location.replace("calculator.html"); return null; }
   if (role === "staff" && !isStaff(a.profile)) { location.replace("calculator.html"); return null; }   // адмін або керівник філії
   renderNav(a.profile);
