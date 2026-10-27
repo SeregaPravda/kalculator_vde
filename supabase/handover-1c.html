@@ -1,0 +1,154 @@
+<div style="max-width:860px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2D2926">
+
+<h1 style="font-size:24px;margin:0 0 4px;color:#2D2926">Інтеграція 1С → калькулятор КП</h1>
+<p style="margin:0 0 22px;color:#7A736D">Пакет для команди розробників. Станом на 27.10.2026. Доступ до бази даних не потрібен, уся робота через обліковий запис і два методи.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">1. Що робимо</h2>
+<p style="margin:0 0 12px">1С надсилає документи в наш сервіс. Сервіс до 1С не звертається і нічого не запитує. Один HTTP-запит це один документ цілком, разом із позиціями.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">2. Доступи</h2>
+<table style="border-collapse:collapse;width:100%;font-size:14px">
+<tr><td style="padding:7px 10px;border:1px solid #E3E0DC;background:#F5F4F2;width:210px">Базова адреса</td><td style="padding:7px 10px;border:1px solid #E3E0DC"><code>https://ohnghdnixulnvrvcapgf.supabase.co</code></td></tr>
+<tr><td style="padding:7px 10px;border:1px solid #E3E0DC;background:#F5F4F2">Заголовок <code>apikey</code></td><td style="padding:7px 10px;border:1px solid #E3E0DC"><code>sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc</code></td></tr>
+<tr><td style="padding:7px 10px;border:1px solid #E3E0DC;background:#F5F4F2">Обліковий запис</td><td style="padding:7px 10px;border:1px solid #E3E0DC"><code>integration.1c@pa.ua</code></td></tr>
+<tr><td style="padding:7px 10px;border:1px solid #E3E0DC;background:#F5F4F2">Пароль</td><td style="padding:7px 10px;border:1px solid #E3E0DC">передається окремо, у цьому документі його немає</td></tr>
+</table>
+<p style="margin:12px 0 0;font-size:13.5px;color:#7A736D">Ключ <code>apikey</code> публічний і потрібен у кожному запиті, це не секрет. Пароль зберігати лише в налаштуваннях обміну 1С. Якщо пароль зміниться, інтеграція продовжить працювати після оновлення його в 1С, нічого переналаштовувати не треба.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">3. Токен</h2>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;overflow-x:auto;margin:0 0 12px">POST /auth/v1/token?grant_type=password
+apikey: &lt;apikey&gt;
+Content-Type: application/json
+
+{ "email": "integration.1c@pa.ua", "password": "&lt;пароль&gt;" }</pre>
+<p style="margin:0 0 12px">У відповіді <code>access_token</code> на 3600 секунд і <code>refresh_token</code>. Далі в кожному запиті заголовок <code>Authorization: Bearer &lt;access_token&gt;</code>.</p>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;overflow-x:auto;margin:0 0 12px">POST /auth/v1/token?grant_type=refresh_token
+apikey: &lt;apikey&gt;
+
+{ "refresh_token": "&lt;refresh_token&gt;" }</pre>
+<p style="margin:0">Якщо документи надсилаються рідко, простіше логінитись перед кожним надсиланням і не возитися з оновленням.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">4. Метод: надіслати документ</h2>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;overflow-x:auto;margin:0 0 12px">POST /rest/v1/rpc/ingest_1c_doc
+apikey: &lt;apikey&gt;
+Authorization: Bearer &lt;access_token&gt;
+Content-Type: application/json
+
+{
+  "p_payload": {
+    "doc_id": "505939",
+    "doc_type": "spec",
+    "doc_date": "2026-09-02",
+    "counterparty": "ТОВ «Приклад»",
+    "manager": "Вельгус",
+    "total": 176973.30,
+    "currency": "UAH",
+    "note": "",
+    "items": [
+      {
+        "line_no": 1,
+        "item_code": "BAT-SE-F16",
+        "item_name": "Акумуляторна батарея DEYE SE-F16-С LiFePO4 LV 51.2V 314Ah 16kWh",
+        "unit": "шт",
+        "qty": 1,
+        "price": 94210.50,
+        "amount": 94210.50
+      }
+    ]
+  }
+}</pre>
+
+<p style="margin:0 0 6px"><b>Поля шапки</b></p>
+<table style="border-collapse:collapse;width:100%;font-size:13.5px;margin:0 0 14px">
+<tr style="background:#2D2926;color:#fff"><th style="padding:6px 9px;text-align:left">Поле</th><th style="padding:6px 9px;text-align:left">Тип</th><th style="padding:6px 9px;text-align:left">Обов'язкове</th><th style="padding:6px 9px;text-align:left">Опис</th></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>doc_id</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC"><b>так</b></td><td style="padding:6px 9px;border:1px solid #E3E0DC">номер документа в 1С, унікальний ключ</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>doc_type</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">spec, invoice, price, order. За замовчуванням spec</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>doc_date</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">YYYY-MM-DD</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">дата документа</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>counterparty</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">контрагент</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>manager</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">менеджер у 1С</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>total</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">число</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">сума документа</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>currency</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">за замовчуванням UAH</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>note</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">примітка</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>items</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">масив</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">позиції документа</td></tr>
+</table>
+
+<p style="margin:0 0 6px"><b>Поля позиції</b></p>
+<table style="border-collapse:collapse;width:100%;font-size:13.5px;margin:0 0 14px">
+<tr style="background:#2D2926;color:#fff"><th style="padding:6px 9px;text-align:left">Поле</th><th style="padding:6px 9px;text-align:left">Тип</th><th style="padding:6px 9px;text-align:left">Обов'язкове</th><th style="padding:6px 9px;text-align:left">Опис</th></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>item_name</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC"><b>так</b></td><td style="padding:6px 9px;border:1px solid #E3E0DC">найменування</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>line_no</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">ціле</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">номер рядка, інакше за порядком</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>item_code</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">артикул, код номенклатури</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>unit</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">рядок</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">одиниця виміру</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>qty</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">число</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">кількість, за замовчуванням 1</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>price</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">число</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ціна за одиницю</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC"><code>amount</code></td><td style="padding:6px 9px;border:1px solid #E3E0DC">число</td><td style="padding:6px 9px;border:1px solid #E3E0DC">ні</td><td style="padding:6px 9px;border:1px solid #E3E0DC">сума рядка</td></tr>
+</table>
+<p style="margin:0 0 12px;font-size:13.5px;color:#7A736D">Будь-які додаткові поля передавати можна, вони збережуться повністю і помилки не спричинять.</p>
+
+<p style="margin:0 0 6px"><b>Успішна відповідь</b></p>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;margin:0 0 12px">{ "ok": true, "doc_id": "505939", "action": "created", "items": 12, "received_at": "2026-10-27T10:00:00+00:00" }</pre>
+<p style="margin:0"><code>action</code>: <b>created</b> новий документ, <b>updated</b> документ із таким номером уже був і його оновлено.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">5. Повторне надсилання</h2>
+<p style="margin:0">Безпечне. Той самий <code>doc_id</code> оновлює шапку, а позиції перезаписуються повністю: скільки прийшло, стільки й лишиться. Дублікатів не виникає, окремих прапорців не потрібно. Це зручно для виправлених документів.</p>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">6. Метод: перевірити документ</h2>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;overflow-x:auto;margin:0 0 10px">POST /rest/v1/rpc/ingest_1c_status
+apikey: &lt;apikey&gt;
+Authorization: Bearer &lt;access_token&gt;
+
+{ "p_doc_id": "505939" }</pre>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;margin:0">{ "found": true, "doc_id": "505939", "doc_type": "spec", "items": 12, "received_at": "...", "updated_at": "..." }</pre>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">7. Помилки</h2>
+<table style="border-collapse:collapse;width:100%;font-size:13.5px">
+<tr style="background:#2D2926;color:#fff"><th style="padding:6px 9px;text-align:left">Код</th><th style="padding:6px 9px;text-align:left">Текст</th><th style="padding:6px 9px;text-align:left">Причина</th></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">401</td><td style="padding:6px 9px;border:1px solid #E3E0DC">invalid JWT</td><td style="padding:6px 9px;border:1px solid #E3E0DC">токен відсутній або протермінований, потрібен новий логін</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">403</td><td style="padding:6px 9px;border:1px solid #E3E0DC">forbidden: only service account may ingest</td><td style="padding:6px 9px;border:1px solid #E3E0DC">запит пішов не під тим обліковим записом</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">400</td><td style="padding:6px 9px;border:1px solid #E3E0DC">doc_id is required</td><td style="padding:6px 9px;border:1px solid #E3E0DC">у документі немає номера</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">400</td><td style="padding:6px 9px;border:1px solid #E3E0DC">items must be an array</td><td style="padding:6px 9px;border:1px solid #E3E0DC">позиції передано не масивом</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">400</td><td style="padding:6px 9px;border:1px solid #E3E0DC">item_name is required in item N</td><td style="padding:6px 9px;border:1px solid #E3E0DC">у позиції N немає найменування</td></tr>
+<tr><td style="padding:6px 9px;border:1px solid #E3E0DC">400</td><td style="padding:6px 9px;border:1px solid #E3E0DC">payload too large (max 2 MB)</td><td style="padding:6px 9px;border:1px solid #E3E0DC">документ більший за 2 МБ, розбити на частини</td></tr>
+</table>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">8. Правила та обмеження</h2>
+<ul style="margin:0;padding-left:20px">
+<li style="margin-bottom:6px">Максимальний розмір документа 2 МБ.</li>
+<li style="margin-bottom:6px">Заголовок <code>Prefer: return=representation</code> не додавати: обліковий запис не має права читати дані, запит впаде.</li>
+<li style="margin-bottom:6px">Обліковий запис уміє лише надсилати документи і перевіряти їх статус. Він не бачить таблиць, цін, комерційних пропозицій і не може зайти у вебінтерфейс калькулятора.</li>
+<li style="margin-bottom:6px">Структура таблиць на нашому боці може змінюватись, формат цього API при цьому лишається незмінним.</li>
+</ul>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">9. Приклад curl</h2>
+<pre style="background:#F5F4F2;border:1px solid #E3E0DC;border-radius:6px;padding:12px;font-size:13px;overflow-x:auto;margin:0">TOKEN=$(curl -s -X POST "https://ohnghdnixulnvrvcapgf.supabase.co/auth/v1/token?grant_type=password" \
+  -H "apikey: sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"integration.1c@pa.ua","password":"ПАРОЛЬ"}' | jq -r .access_token)
+
+curl -X POST "https://ohnghdnixulnvrvcapgf.supabase.co/rest/v1/rpc/ingest_1c_doc" \
+  -H "apikey: sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"p_payload":{"doc_id":"505939","doc_type":"spec","items":[{"item_name":"Тест","qty":1}]}}'</pre>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">10. Як перевірити себе</h2>
+<p style="margin:0 0 10px">До пакета додані два файли: <code>postman-1c-integration.json</code> (колекція) і <code>postman-1c-environment.json</code> (оточення). Імпортувати обидва, у змінній <code>password</code> вписати пароль, запустити колекцію. Шість перевірок мають пройти зеленими:</p>
+<ol style="margin:0;padding-left:20px">
+<li style="margin-bottom:5px">логін і отримання токена;</li>
+<li style="margin-bottom:5px">надсилання документа з двома позиціями, відповідь <code>created</code>;</li>
+<li style="margin-bottom:5px">повторне надсилання того самого номера, відповідь <code>updated</code> і одна позиція;</li>
+<li style="margin-bottom:5px">перевірка статусу документа;</li>
+<li style="margin-bottom:5px">документ без <code>doc_id</code> відхиляється;</li>
+<li>запит без токена відхиляється.</li>
+</ol>
+
+<h2 style="font-size:17px;color:#FE5000;margin:26px 0 8px">11. Що потрібно від вас у відповідь</h2>
+<ol style="margin:0;padding-left:20px">
+<li style="margin-bottom:5px">Перелік типів документів, які реально підете слати, і яке значення <code>doc_type</code> для кожного.</li>
+<li style="margin-bottom:5px">Приклад справжнього JSON по кожному типу, хоча б по одному документу.</li>
+<li style="margin-bottom:5px">Як часто і за якою подією відбувається вивантаження: за фактом проведення документа чи за розкладом.</li>
+<li>Чи потрібно вам надсилати видалення або скасування документів, і як ви це позначаєте в 1С.</li>
+</ol>
+<p style="margin:14px 0 0;color:#7A736D;font-size:13.5px">Після цього ми під'єднаємо ці дані до калькулятора: специфікації й ціни почнуть підтягуватись у комерційні пропозиції автоматично.</p>
+
+</div>
