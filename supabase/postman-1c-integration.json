@@ -1,0 +1,192 @@
+{
+  "info": {
+    "name": "Промавтоматика · 1С → Supabase",
+    "description": "Перевірка інтеграції: логін технічного акаунта, надсилання документа, ідемпотентність, оновлення токена і негативний тест. Перед запуском заповніть змінну password у вкладці Variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://ohnghdnixulnvrvcapgf.supabase.co", "type": "string" },
+    { "key": "apikey", "value": "sb_publishable_BbdzYMCW4CbQvAJ_FM1_fg_Su9xq7Tc", "type": "string" },
+    { "key": "email", "value": "integration.1c@pa.ua", "type": "string" },
+    { "key": "password", "value": "", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" },
+    { "key": "refresh_token", "value": "", "type": "string" },
+    { "key": "doc_id", "value": "TEST-001", "type": "string" },
+    { "key": "inbox_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Логін технічного акаунта",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/v1/token?grant_type=password",
+          "host": ["{{base_url}}"],
+          "path": ["auth", "v1", "token"],
+          "query": [{ "key": "grant_type", "value": "password" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "var j = pm.response.json();",
+              "pm.test('Прийшов access_token', function () { pm.expect(j.access_token).to.be.a('string'); });",
+              "pm.collectionVariables.set('access_token', j.access_token);",
+              "pm.collectionVariables.set('refresh_token', j.refresh_token);",
+              "console.log('Токен діє секунд: ' + j.expires_in);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Надіслати документ",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "host": ["{{base_url}}"],
+          "path": ["rest", "v1", "rpc", "ingest_1c"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"{{doc_id}}\",\n  \"p_payload\": {\n    \"номер\": \"{{doc_id}}\",\n    \"дата\": \"2026-10-27\",\n    \"контрагент\": \"ТОВ «Приклад»\",\n    \"позиції\": [\n      {\n        \"найменування\": \"Акумуляторна батарея DEYE SE-F16-С LiFePO4 LV 51.2V 314Ah 16kWh\",\n        \"кількість\": 1,\n        \"одиниця\": \"шт\",\n        \"ціна\": 94210.5,\n        \"сума\": 94210.5\n      },\n      {\n        \"найменування\": \"Інвертор гібридний 6 кВт 1ф SUN-6K-SG05LP1-EU DEYE\",\n        \"кількість\": 1,\n        \"одиниця\": \"шт\",\n        \"ціна\": 43440,\n        \"сума\": 43440\n      }\n    ],\n    \"разом\": 137650.5,\n    \"валюта\": \"UAH\"\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "var j = pm.response.json();",
+              "pm.test('ok = true', function () { pm.expect(j.ok).to.eql(true); });",
+              "pm.test('Повернувся id запису', function () { pm.expect(j.id).to.be.a('number'); });",
+              "pm.collectionVariables.set('inbox_id', j.id);",
+              "console.log('Документ прийнято, id = ' + j.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Повторне надсилання того самого документа",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "host": ["{{base_url}}"],
+          "path": ["rest", "v1", "rpc", "ingest_1c"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"{{doc_id}}\",\n  \"p_payload\": {\n    \"номер\": \"{{doc_id}}\",\n    \"дата\": \"2026-10-27\",\n    \"контрагент\": \"ТОВ «Приклад»\",\n    \"примітка\": \"той самий документ, виправлена сума\",\n    \"разом\": 137650.5,\n    \"валюта\": \"UAH\"\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "var j = pm.response.json();",
+              "pm.test('Дубль не створився: той самий id', function () {",
+              "  pm.expect(String(j.id)).to.eql(String(pm.collectionVariables.get('inbox_id')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Оновити токен",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/v1/token?grant_type=refresh_token",
+          "host": ["{{base_url}}"],
+          "path": ["auth", "v1", "token"],
+          "query": [{ "key": "grant_type", "value": "refresh_token" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Статус 200', function () { pm.response.to.have.status(200); });",
+              "var j = pm.response.json();",
+              "pm.collectionVariables.set('access_token', j.access_token);",
+              "pm.collectionVariables.set('refresh_token', j.refresh_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Без токена має бути відмова",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "apikey", "value": "{{apikey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/rest/v1/rpc/ingest_1c",
+          "host": ["{{base_url}}"],
+          "path": ["rest", "v1", "rpc", "ingest_1c"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"p_doc_type\": \"spec\",\n  \"p_doc_id\": \"NO-TOKEN\",\n  \"p_payload\": { \"a\": 1 }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Запит без токена відхилено', function () {",
+              "  pm.expect([401, 403]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
